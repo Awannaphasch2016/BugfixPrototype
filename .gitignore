@@ -1,0 +1,11 @@
+# Answer key & private demo material — must never reach GitHub
+harness/private/
+
+# Dependencies / build output
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Local env
+.env
+.env.*
