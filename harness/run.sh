@@ -57,7 +57,7 @@ When you are done, your final reply must be a pull-request description in markdo
 - "## Fix" — what you changed and why it is correct
 - "## Regression test" — the new test and its red-then-green result
 
-Your final reply is used verbatim as the PR body.
+Your final reply is used verbatim as the PR body — it must contain ONLY the PR description, starting with "## Diagnosis", with no preamble or closing remarks around it.
 EOF
 )
 
