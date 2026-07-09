@@ -78,6 +78,26 @@ describe("PATCH /api/tasks/:id", () => {
     expect(list.tasks[0].completed).toBe(false);
   });
 
+  it("keeps the due date when a patch omits it", async () => {
+    const { task } = await (
+      await createTask({ title: "Renew TLS cert", dueDate: "2026-07-12" })
+    ).json();
+    await patchTask(task.id, { completed: true });
+
+    const list = await (await listTasks()).json();
+    expect(list.tasks[0].dueDate).toBe("2026-07-12");
+  });
+
+  it("clears the due date when a patch sets it to null", async () => {
+    const { task } = await (
+      await createTask({ title: "Renew TLS cert", dueDate: "2026-07-12" })
+    ).json();
+    await patchTask(task.id, { dueDate: null });
+
+    const list = await (await listTasks()).json();
+    expect(list.tasks[0].dueDate).toBeNull();
+  });
+
   it("404s for an unknown task id", async () => {
     const res = await patchTask("does-not-exist", { completed: true });
     expect(res.status).toBe(404);
