@@ -11,6 +11,7 @@ const MERGED_PRS = [
   { number: 4, title: "Fix #1: Done filter shows active tasks", url: `${REPO}/pull/4`, headRefName: "fix/issue-1" },
   { number: 9, title: "Fix #9: still open", url: `${REPO}/pull/9`, headRefName: "fix/issue-9" },
   { number: 10, title: "Update readme", url: `${REPO}/pull/10`, headRefName: "docs/readme" },
+  { number: 12, title: "Fix #1: Done filter shows active tasks (rerun)", url: `${REPO}/pull/12`, headRefName: "fix/issue-1" },
 ];
 
 const CLOSED_ISSUES = [
@@ -60,14 +61,16 @@ describe("GET /api/unsolved-issues", () => {
 });
 
 describe("GET /api/autofixed", () => {
-  it("lists merged fix-branch PRs whose issue is currently closed", async () => {
+  it("lists merged fix-branch PRs whose issue is currently closed, latest PR per issue", async () => {
+    // PR #4 is an older rehearsal-cycle merge for the same issue: merged PRs
+    // live forever on GitHub, so only the newest one may represent the lane.
     const res = await listAutofixed();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       autofixed: [
         {
           issue: CLOSED_ISSUES[0],
-          pr: { number: 4, title: "Fix #1: Done filter shows active tasks", url: `${REPO}/pull/4` },
+          pr: { number: 12, title: "Fix #1: Done filter shows active tasks (rerun)", url: `${REPO}/pull/12` },
         },
       ],
     });

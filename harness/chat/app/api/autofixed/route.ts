@@ -23,13 +23,22 @@ export async function GET() {
       (JSON.parse(issuesOut) as GhIssue[]).map((issue) => [issue.number, issue]),
     );
 
-    const autofixed = prs.flatMap((pr) => {
+    // Merged PRs live forever, so a re-fixed issue has one merged PR per
+    // rehearsal cycle sharing the same fix branch — only the latest merge
+    // represents the lane.
+    const latestPerIssue = new Map<number, { issue: GhIssue; pr: Omit<GhPr, "headRefName"> }>();
+    for (const pr of prs) {
       const match = FIX_BRANCH.exec(pr.headRefName);
       const issue = match && closedIssues.get(Number(match[1]));
-      if (!issue) return [];
-      return [{ issue, pr: { number: pr.number, title: pr.title, url: pr.url } }];
-    });
-    return Response.json({ autofixed });
+      if (!issue) continue;
+      const existing = latestPerIssue.get(issue.number);
+      if (existing && existing.pr.number > pr.number) continue;
+      latestPerIssue.set(issue.number, {
+        issue,
+        pr: { number: pr.number, title: pr.title, url: pr.url },
+      });
+    }
+    return Response.json({ autofixed: [...latestPerIssue.values()] });
   } catch (error) {
     return errorResponse(error);
   }
