@@ -31,6 +31,12 @@ demo app hot-reloads with the fix. One run at a time; chat state is in-memory
 and disposable. GitHub stays the system of record — the chat links to real
 issues, PRs, and diffs, never re-renders them.
 
+The blocking dispatch request is the notification channel on localhost. When
+the browser reaches the backend through a proxy that caps request duration
+(Codespaces web port forwarding kills requests at ~100s), the run keeps going
+server-side and the page recovers its outcome from `/api/dispatch-status` —
+polling is the fallback for proxied access only, never the primary path.
+
 Route handlers are tested (`cd chat && npm test`) with the runner, `git`, and
 `gh` replaced by stub scripts via `CHAT_RUNNER_CMD`/`CHAT_GIT_CMD`/
 `CHAT_GH_CMD` (`CHAT_REPO_ROOT` overrides the working directory). The UI has

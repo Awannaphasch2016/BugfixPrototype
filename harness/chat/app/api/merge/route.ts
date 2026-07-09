@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ghCmd, gitCmd } from "@/lib/config";
 import { errorResponse } from "@/lib/http";
-import { acquireRunLock, releaseRunLock } from "@/lib/lock";
+import { acquireRunLock, releaseRunLock } from "@/lib/run-state";
 import { restoreRuntimeDirtiedFiles } from "@/lib/restore";
 import { run } from "@/lib/shell";
 
