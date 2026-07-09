@@ -1,3 +1,7 @@
+# Tasks — dev notes
+
+- Task data lives in a local JSON file (`data/tasks.json` by default, `TASKS_FILE` overrides).
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
