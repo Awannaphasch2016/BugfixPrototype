@@ -9,7 +9,7 @@ function DueBadge({ dueDate }: { dueDate: string | null }) {
   return (
     <span
       className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
-        overdue ? "bg-red-100 text-red-700" : "bg-zinc-100 text-zinc-600"
+        overdue ? "bg-red-950 text-red-300" : "bg-zinc-800 text-zinc-300"
       }`}
     >
       due {dueDate}
@@ -37,12 +37,12 @@ function TaskRow({
   }
 
   return (
-    <li className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3">
+    <li className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
       <input
         type="checkbox"
         checked={task.completed}
         onChange={() => onToggle(task)}
-        className="h-4 w-4 accent-zinc-800"
+        className="h-4 w-4 accent-zinc-300"
       />
       {editing ? (
         <input
@@ -51,13 +51,13 @@ function TaskRow({
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === "Enter" && commit()}
-          className="flex-1 rounded border border-zinc-300 px-2 py-1 text-sm"
+          className="flex-1 rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-sm text-zinc-100"
         />
       ) : (
         <span
           onClick={() => setEditing(true)}
           className={`flex-1 cursor-text text-sm ${
-            task.completed ? "text-zinc-400 line-through" : "text-zinc-800"
+            task.completed ? "text-zinc-500 line-through" : "text-zinc-100"
           }`}
           title="Click to rename"
         >
@@ -114,24 +114,24 @@ export default function Home() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10">
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-900">Tasks</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Tasks</h1>
 
       <form onSubmit={addTask} className="mb-6 flex gap-2">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Add a task…"
-          className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm"
+          className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500"
         />
         <input
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
-          className="rounded border border-zinc-300 px-2 py-2 text-sm text-zinc-600"
+          className="rounded border border-zinc-700 bg-zinc-900 px-2 py-2 text-sm text-zinc-400"
         />
         <button
           type="submit"
-          className="rounded bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-700"
+          className="rounded bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white"
         >
           Add
         </button>
@@ -144,8 +144,8 @@ export default function Home() {
             onClick={() => setFilter(f)}
             className={`rounded-full px-3 py-1 text-sm capitalize ${
               filter === f
-                ? "bg-zinc-900 text-white"
-                : "text-zinc-500 hover:bg-zinc-100"
+                ? "bg-zinc-100 text-zinc-900"
+                : "text-zinc-400 hover:bg-zinc-800"
             }`}
           >
             {f}
@@ -153,7 +153,7 @@ export default function Home() {
         ))}
       </div>
 
-      <ul className="rounded-lg border border-zinc-200 bg-white">
+      <ul className="rounded-lg border border-zinc-800 bg-zinc-950">
         {tasks.map((task) => (
           <TaskRow
             key={task.id}
@@ -163,7 +163,7 @@ export default function Home() {
           />
         ))}
         {tasks.length === 0 && (
-          <li className="px-4 py-6 text-sm text-zinc-400">No tasks yet.</li>
+          <li className="px-4 py-6 text-sm text-zinc-500">No tasks yet.</li>
         )}
       </ul>
     </div>
