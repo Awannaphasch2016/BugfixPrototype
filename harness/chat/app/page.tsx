@@ -1,0 +1,306 @@
+"use client";
+
+import { useRef, useState } from "react";
+import {
+  ChatContainer,
+  ConversationHeader,
+  MainContainer,
+  Message,
+  MessageInput,
+  MessageList,
+  TypingIndicator,
+} from "@chatscope/chat-ui-kit-react";
+
+type Issue = { number: number; title: string; url: string };
+type PrRef = { number: number; title?: string; url: string };
+type AutofixedEntry = { issue: Issue; pr: PrRef };
+
+// One state per card, one direction: a failed merge parks the card (recovery
+// is the runbook, not a retry button).
+type PrCardState = "ready" | "merging" | "merged" | "failed";
+
+type ChatMessage =
+  | { id: number; kind: "user"; text: string }
+  | { id: number; kind: "bot"; text: string; chips?: boolean }
+  | { id: number; kind: "autofixed"; entries: AutofixedEntry[] }
+  | { id: number; kind: "unsolved"; issues: Issue[] }
+  | {
+      id: number;
+      kind: "pr";
+      issue: Issue;
+      prNumber: number;
+      prUrl: string;
+      state: PrCardState;
+    };
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+const LIST_AUTOFIXED = "/list-recently-autofixed";
+const LIST_UNSOLVED = "/list-unsolved-issues";
+
+const WELCOME =
+  "Hi! I run the bug-fix pipeline. I fix routine bugs on my own; " +
+  "anything I'm not yet trusted with waits for you to dispatch it. " +
+  "Pick a command:";
+
+export default function Home() {
+  const nextId = useRef(1);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: 0, kind: "bot", text: WELCOME, chips: true },
+  ]);
+  // One run at a time against the shared checkout: while a dispatch or merge
+  // is in flight, every Fix-this and Merge button is disabled.
+  const [inFlight, setInFlight] = useState(false);
+  const [activeIssue, setActiveIssue] = useState<number | null>(null);
+  const [dispatchedIssues, setDispatchedIssues] = useState<Set<number>>(new Set());
+
+  function add(msg: DistributiveOmit<ChatMessage, "id">) {
+    const id = nextId.current++;
+    setMessages((prev) => [...prev, { ...msg, id } as ChatMessage]);
+    return id;
+  }
+
+  const addBot = (text: string, chips = false) => add({ kind: "bot", text, chips });
+
+  function setPrCardState(id: number, state: PrCardState) {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id && m.kind === "pr" ? { ...m, state } : m)),
+    );
+  }
+
+  async function fetchJson(url: string, init?: RequestInit) {
+    const res = await fetch(url, init);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error ?? `request failed (${res.status})`);
+    return data;
+  }
+
+  async function listAutofixed() {
+    try {
+      const { autofixed } = await fetchJson("/api/autofixed");
+      if (autofixed.length === 0) {
+        addBot("The autofix lane is empty — no merged fixes with a closed issue yet.", true);
+      } else {
+        add({ kind: "autofixed", entries: autofixed });
+      }
+    } catch (error) {
+      addBot(`Something went wrong listing autofixed issues: ${(error as Error).message}`);
+    }
+  }
+
+  async function listUnsolved() {
+    try {
+      const { issues } = await fetchJson("/api/unsolved-issues");
+      if (issues.length === 0) {
+        addBot("No unsolved issues — the queue is clear.", true);
+      } else {
+        add({ kind: "unsolved", issues });
+      }
+    } catch (error) {
+      addBot(`Something went wrong listing unsolved issues: ${(error as Error).message}`);
+    }
+  }
+
+  function handleCommand(raw: string) {
+    const text = raw.trim();
+    if (!text) return;
+    add({ kind: "user", text });
+    if (text === LIST_AUTOFIXED) {
+      void listAutofixed();
+    } else if (text === LIST_UNSOLVED) {
+      void listUnsolved();
+    } else {
+      addBot("I only speak two commands — pick one:", true);
+    }
+  }
+
+  // Dispatch blocks until the runner exits; the open request is the
+  // notification channel, so the PR card lands at the true moment of readiness.
+  async function handleFix(issue: Issue) {
+    setInFlight(true);
+    setActiveIssue(issue.number);
+    addBot(
+      `On it — dispatching the fixer agent on issue #${issue.number}. ` +
+        "I'll post the PR here the moment it's ready.",
+    );
+    try {
+      const { prUrl, prNumber } = await fetchJson("/api/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issue: issue.number }),
+      });
+      setDispatchedIssues((prev) => new Set(prev).add(issue.number));
+      add({ kind: "pr", issue, prNumber, prUrl, state: "ready" });
+    } catch (error) {
+      addBot(`The run for issue #${issue.number} failed: ${(error as Error).message}`);
+    } finally {
+      setInFlight(false);
+      setActiveIssue(null);
+    }
+  }
+
+  async function handleMerge(msgId: number, prNumber: number) {
+    setInFlight(true);
+    setPrCardState(msgId, "merging");
+    try {
+      await fetchJson("/api/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pr: prNumber }),
+      });
+      setPrCardState(msgId, "merged");
+      addBot(
+        `Merged PR #${prNumber}. The local checkout is synced — ` +
+          "the app reloads with the fix, so redo the gesture and the bug is gone.",
+      );
+    } catch (error) {
+      setPrCardState(msgId, "failed");
+      addBot(`The merge of PR #${prNumber} failed: ${(error as Error).message}`);
+    } finally {
+      setInFlight(false);
+    }
+  }
+
+  function CommandChips() {
+    return (
+      <div className="chip-row">
+        <button className="chip" onClick={() => handleCommand(LIST_AUTOFIXED)}>
+          {LIST_AUTOFIXED}
+        </button>
+        <button className="chip" onClick={() => handleCommand(LIST_UNSOLVED)}>
+          {LIST_UNSOLVED}
+        </button>
+      </div>
+    );
+  }
+
+  function renderContent(msg: ChatMessage) {
+    switch (msg.kind) {
+      case "user":
+      case "bot":
+        return (
+          <>
+            {msg.text}
+            {msg.kind === "bot" && msg.chips && <CommandChips />}
+          </>
+        );
+      case "autofixed":
+        return (
+          <>
+            Fixed with no human in the loop — every link is the real GitHub record:
+            {msg.entries.map(({ issue, pr }) => (
+              <div className="card" key={pr.number}>
+                <div className="card-title">
+                  #{issue.number} {issue.title}
+                </div>
+                <div className="card-links">
+                  <a href={issue.url} target="_blank" rel="noreferrer">
+                    issue #{issue.number} (closed)
+                  </a>
+                  <a href={pr.url} target="_blank" rel="noreferrer">
+                    PR #{pr.number} (merged)
+                  </a>
+                </div>
+              </div>
+            ))}
+          </>
+        );
+      case "unsolved":
+        return (
+          <>
+            In the queue — dispatch one and I&apos;ll take a shot at it:
+            {msg.issues.map((issue) => (
+              <div className="card" key={issue.number}>
+                <div className="card-title">
+                  #{issue.number} {issue.title}
+                </div>
+                <div className="card-links">
+                  <a href={issue.url} target="_blank" rel="noreferrer">
+                    view issue
+                  </a>
+                </div>
+                <button
+                  className="btn"
+                  disabled={inFlight || dispatchedIssues.has(issue.number)}
+                  onClick={() => handleFix(issue)}
+                >
+                  {activeIssue === issue.number
+                    ? "Working on it…"
+                    : dispatchedIssues.has(issue.number)
+                      ? "PR ready — see below"
+                      : "Fix this"}
+                </button>
+              </div>
+            ))}
+          </>
+        );
+      case "pr":
+        return (
+          <div className="card">
+            <div className="card-title">
+              PR #{msg.prNumber} ready for issue #{msg.issue.number}
+            </div>
+            <div className="card-links">
+              <a href={`${msg.prUrl}/files`} target="_blank" rel="noreferrer">
+                view diff
+              </a>
+              <a href={msg.prUrl} target="_blank" rel="noreferrer">
+                view PR
+              </a>
+            </div>
+            {msg.state === "merged" ? (
+              <div className="card-status">Merged — live in the app.</div>
+            ) : msg.state === "failed" ? (
+              <div className="card-status">Merge failed — recover via the runbook.</div>
+            ) : (
+              <button
+                className="btn"
+                disabled={inFlight || msg.state !== "ready"}
+                onClick={() => handleMerge(msg.id, msg.prNumber)}
+              >
+                {msg.state === "merging" ? "Merging…" : "Merge"}
+              </button>
+            )}
+          </div>
+        );
+    }
+  }
+
+  return (
+    <main className="chat-shell">
+      <MainContainer>
+        <ChatContainer>
+          <ConversationHeader>
+            <ConversationHeader.Content
+              userName="Pipeline Bot"
+              info="bug-fix pipeline — issues and PRs live on GitHub"
+            />
+          </ConversationHeader>
+          <MessageList
+            typingIndicator={
+              inFlight ? <TypingIndicator content="Fixer agent is working" /> : undefined
+            }
+          >
+            {messages.map((msg) => (
+              <Message
+                key={msg.id}
+                model={{
+                  type: "custom",
+                  position: "single",
+                  direction: msg.kind === "user" ? "outgoing" : "incoming",
+                }}
+              >
+                <Message.CustomContent>{renderContent(msg)}</Message.CustomContent>
+              </Message>
+            ))}
+          </MessageList>
+          <MessageInput
+            placeholder={`Type ${LIST_AUTOFIXED} or ${LIST_UNSOLVED}`}
+            attachButton={false}
+            onSend={(_html, textContent) => handleCommand(textContent)}
+          />
+        </ChatContainer>
+      </MainContainer>
+    </main>
+  );
+}

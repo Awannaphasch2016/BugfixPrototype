@@ -1,0 +1,77 @@
+.chat-shell {
+  height: 100vh;
+}
+
+.card {
+  border: 1px solid #d1d9e0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  background: #fff;
+  max-width: 420px;
+}
+
+.card-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.card-links {
+  display: flex;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.card-links a {
+  color: #0969da;
+  text-decoration: none;
+  font-size: 0.9em;
+}
+
+.card-links a:hover {
+  text-decoration: underline;
+}
+
+.card-status {
+  font-size: 0.85em;
+  color: #57606a;
+  margin-top: 4px;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.chip {
+  border: 1px solid #0969da;
+  color: #0969da;
+  background: #fff;
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.chip:hover:enabled {
+  background: #f0f6ff;
+}
+
+.btn {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.9em;
+  cursor: pointer;
+  background: #1f883d;
+  color: #fff;
+  margin-top: 6px;
+}
+
+.btn:disabled,
+.chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
