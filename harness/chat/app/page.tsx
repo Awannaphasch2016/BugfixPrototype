@@ -75,6 +75,51 @@ export default function Home() {
     return data;
   }
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // The blocking dispatch request is the primary channel. A proxy between the
+  // browser and the backend (e.g. Codespaces port forwarding, which caps
+  // requests at ~100s) can kill it mid-run while the run keeps going
+  // server-side — so on a transport-level failure we recover the outcome by
+  // polling the status route. A localhost demo never takes this path.
+  async function dispatchAndAwait(issue: number): Promise<{ prUrl: string; prNumber: number }> {
+    let res: Response;
+    try {
+      res = await fetch("/api/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issue }),
+      });
+    } catch {
+      return awaitViaStatus(issue);
+    }
+    const data = await res.json().catch(() => null);
+    if (res.ok) return data;
+    if (data?.error) throw new Error(data.error); // the backend itself answered
+    return awaitViaStatus(issue); // a proxy answered (504 and friends)
+  }
+
+  async function awaitViaStatus(issue: number): Promise<{ prUrl: string; prNumber: number }> {
+    for (let attempt = 0; attempt < 240; attempt++) {
+      await sleep(5000);
+      let outcome;
+      try {
+        outcome = await fetchJson("/api/dispatch-status");
+      } catch {
+        continue; // transient hiccup on the recovery channel — keep polling
+      }
+      if (outcome.status === "running" && outcome.issue === issue) continue;
+      if (outcome.status === "done" && outcome.issue === issue) {
+        return { prUrl: outcome.prUrl, prNumber: outcome.prNumber };
+      }
+      if (outcome.status === "failed" && outcome.issue === issue) {
+        throw new Error(outcome.error);
+      }
+      throw new Error("lost track of the run — check GitHub for the PR before retrying");
+    }
+    throw new Error("gave up waiting for the run — check GitHub for the PR before retrying");
+  }
+
   async function listAutofixed() {
     try {
       const { autofixed } = await fetchJson("/api/autofixed");
@@ -124,11 +169,7 @@ export default function Home() {
         "I'll post the PR here the moment it's ready.",
     );
     try {
-      const { prUrl, prNumber } = await fetchJson("/api/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ issue: issue.number }),
-      });
+      const { prUrl, prNumber } = await dispatchAndAwait(issue.number);
       setDispatchedIssues((prev) => new Set(prev).add(issue.number));
       add({ kind: "pr", issue, prNumber, prUrl, state: "ready" });
     } catch (error) {
