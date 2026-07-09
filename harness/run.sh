@@ -17,6 +17,7 @@ ISSUE="${1:?usage: harness/run.sh <issue-number>}"
 abort() {
   echo "ERROR: $1" >&2
   git reset -q --hard
+  git clean -qfd -- "$APP_DIR"
   git checkout -q main
   git branch -q -D "$BRANCH" 2>/dev/null || true
   exit 1
@@ -75,26 +76,33 @@ PR_BODY=$(jq -r '.result' "$RESULT_JSON")
 # keep the session transcript for the rehearsal audit
 SESSION_ID=$(jq -r '.session_id' "$RESULT_JSON")
 TRANSCRIPT="$HOME/.claude/projects/$(echo "$REPO_ROOT/$APP_DIR" | tr '/.' '--')/$SESSION_ID.jsonl"
-[[ -f "$TRANSCRIPT" ]] && cp "$TRANSCRIPT" "harness/private/transcript-issue-$ISSUE.jsonl"
+if [[ -f "$TRANSCRIPT" ]]; then
+  cp "$TRANSCRIPT" "harness/private/transcript-issue-$ISSUE.jsonl"
+else
+  echo "WARNING: session transcript not found at $TRANSCRIPT — rehearsal audit will lack it" >&2
+fi
 
 git add -A
 CHANGED=$(git diff --cached --name-only)
 [[ -n "$CHANGED" ]] || abort "agent made no changes"
-if echo "$CHANGED" | grep -qv "^$APP_DIR/"; then
-  abort "agent touched files outside $APP_DIR: $(echo "$CHANGED" | grep -v "^$APP_DIR/" | tr '\n' ' ')"
-fi
+while IFS= read -r f; do
+  [[ "$f" == "$APP_DIR"/* ]] || abort "agent touched a file outside $APP_DIR: $f"
+done <<<"$CHANGED"
 
 git commit -q -m "Fix #$ISSUE: $TITLE" \
-  -m "Automated fix produced by the pipeline agent; see the PR body for the diagnosis." \
+  -m "$PR_BODY" \
   -m "Co-Authored-By: Claude <noreply@anthropic.com>"
 git push -q -u origin "$BRANCH"
 
-PR_URL=$(gh pr create --base main --head "$BRANCH" \
+if ! PR_URL=$(gh pr create --base main --head "$BRANCH" \
   --title "Fix #$ISSUE: $TITLE" \
   --body "$PR_BODY
 
 ---
-Closes #$ISSUE")
+Closes #$ISSUE"); then
+  git push -q origin --delete "$BRANCH" || true
+  abort "gh pr create failed — remote branch removed, nothing published"
+fi
 
 git checkout -q main
 echo "==> PR ready for review: $PR_URL"
