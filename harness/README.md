@@ -14,15 +14,39 @@ directory; this directory owns everything deterministic.
 - `reset.sh` — rewinds local and GitHub state to the `demo-baseline` tag:
   force-resets main, closes open PRs, deletes `fix/*` branches, reopens the
   bug issues. Run between rehearsals and before the live demo.
+- `setup.sh` — pre-demo step after `reset.sh`: runs bug 1 through the pipeline
+  and auto-merges its PR, so the demo opens with autofix history in place
+  (issue #1 closed, issues #2/#3 open, no open PRs).
+
+## Chat control surface (`chat/`)
+
+A small Next.js app (`npm run dev`, port 4000) standing in for
+Slack/Telegram/LINE: the operator commands the pipeline from a chat page
+instead of a terminal. Commands `/list-recently-autofixed` and
+`/list-unsolved-issues` render cards backed by live GitHub queries; **Fix
+this** on an issue card restores the two runtime-dirtied demo-app data files
+and runs `run.sh` (one blocking request — the response is the PR card);
+**Merge** merges the real PR via `gh` and fast-forwards the local main so the
+demo app hot-reloads with the fix. One run at a time; chat state is in-memory
+and disposable. GitHub stays the system of record — the chat links to real
+issues, PRs, and diffs, never re-renders them.
+
+Route handlers are tested (`cd chat && npm test`) with the runner, `git`, and
+`gh` replaced by stub scripts via `CHAT_RUNNER_CMD`/`CHAT_GIT_CMD`/
+`CHAT_GH_CMD` (`CHAT_REPO_ROOT` overrides the working directory). The UI has
+no automated tests; the rehearsal walkthrough covers it.
 
 ## Demo sequence
 
 Fix issues in order (1 → 2 → 3), merging each PR before running the next —
-earlier regression tests protect later fixes that share code paths.
+earlier regression tests protect later fixes that share code paths. Bug 1 is
+pre-fixed by `setup.sh`; bugs 2 and 3 are dispatched live from the chat.
 
-Per bug: show the symptom in the UI → show the GitHub issue → `run.sh <n>` →
-walk the PR (diagnosis narrative, diff, red→green regression test) → approve &
-merge via GitHub review → show the UI fixed.
+Per bug: show the symptom in the UI → `/list-unsolved-issues` in the chat →
+**Fix this** → walk the autofix lane while the run blocks → PR card arrives →
+glance at the PR on GitHub (diagnosis narrative, diff, red→green regression
+test) → **Merge** in the chat → show the UI fixed. The full runbook (setup,
+choreography, recovery ladder) lives in `harness/private/`.
 
 ## Rehearsal ritual (definition of demo-ready, per bug)
 
