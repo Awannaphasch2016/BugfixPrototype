@@ -1,0 +1,131 @@
+[
+  {
+    "id": "agnypf5h",
+    "title": "Book flights for the offsite",
+    "completed": false,
+    "dueDate": "2026-07-21",
+    "createdAt": "2026-07-09T02:05:17.358Z"
+  },
+  {
+    "id": "w9fj6pwv",
+    "title": "Order more standing desks",
+    "completed": false,
+    "dueDate": null,
+    "createdAt": "2026-07-09T02:05:19.875Z"
+  },
+  {
+    "id": "eauls36k",
+    "title": "Prep quarterly security questionnaire",
+    "completed": false,
+    "dueDate": "2026-07-24",
+    "createdAt": "2026-07-09T02:05:20.151Z"
+  },
+  {
+    "id": "qm5u4rrm",
+    "title": "Clean up unused feature flags",
+    "completed": false,
+    "dueDate": null,
+    "createdAt": "2026-07-09T02:05:20.937Z"
+  },
+  {
+    "id": "kbls3r8i",
+    "title": "Rotate the shared demo account password",
+    "completed": false,
+    "dueDate": "2026-07-14",
+    "createdAt": "2026-07-09T02:05:22.645Z"
+  },
+  {
+    "id": "cpk2496u",
+    "title": "Chase legal for redlines on the MSA renewal (they said end of week, it is now the week after and sales is getting antsy about the close date)",
+    "completed": false,
+    "dueDate": null,
+    "createdAt": "2026-07-09T02:05:23.846Z"
+  },
+  {
+    "id": "8dhveb0b",
+    "title": "Collect talk proposals for the eng all-hands",
+    "completed": false,
+    "dueDate": null,
+    "createdAt": "2026-07-09T02:05:25.550Z"
+  },
+  {
+    "id": "3tkfgnrr",
+    "title": "Swap the office router",
+    "completed": false,
+    "dueDate": "2026-07-10",
+    "createdAt": "2026-07-09T02:05:26.113Z"
+  },
+  {
+    "id": "2acyiym1",
+    "title": "Fix flaky deploy notification (Slack webhook times out)",
+    "completed": false,
+    "createdAt": "2026-07-09T02:05:18.671Z"
+  },
+  {
+    "id": "548698wv",
+    "title": "Renew staging TLS cert before Friday",
+    "completed": false,
+    "createdAt": "2026-07-09T02:05:19.096Z"
+  },
+  {
+    "id": "2jokpv3y",
+    "title": "Triage support inbox",
+    "completed": false,
+    "createdAt": "2026-07-09T02:05:24.435Z"
+  },
+  {
+    "id": "8pdxoa44",
+    "title": "Update the on-call rota",
+    "completed": true,
+    "createdAt": "2026-07-09T02:05:17.724Z"
+  },
+  {
+    "id": "614eaeb9",
+    "title": "Send April usage report to finance",
+    "completed": true,
+    "createdAt": "2026-07-09T02:05:17.999Z"
+  },
+  {
+    "id": "602kxo72",
+    "title": "Draft blog post on the new importer",
+    "completed": true,
+    "createdAt": "2026-07-09T02:05:18.923Z"
+  },
+  {
+    "id": "3tf9zanw",
+    "title": "Schedule dentist (again)",
+    "completed": true,
+    "createdAt": "2026-07-09T02:05:21.448Z"
+  },
+  {
+    "id": "6tl6c93v",
+    "title": "Write runbook for the nightly export job",
+    "completed": true,
+    "createdAt": "2026-07-09T02:05:23.306Z"
+  },
+  {
+    "id": "vdmxc99h",
+    "title": "Upgrade CI runners to node 24",
+    "completed": true,
+    "createdAt": "2026-07-09T02:05:25.014Z"
+  },
+  {
+    "id": "61tgb989",
+    "title": "Review Priya's schema migration PR",
+    "completed": false,
+    "createdAt": "2026-07-09T02:05:19.630Z"
+  },
+  {
+    "id": "aaco6pej",
+    "title": "Ping Marco about the retro",
+    "completed": true,
+    "createdAt": "2026-07-09T02:06:38.123Z"
+  },
+  {
+    "id": "t9c7d5yc",
+    "title": "Restock coffee beans",
+    "completed": false,
+    "dueDate": "2026-07-14",
+    "createdAt": "2026-07-09T02:06:39.398Z"
+  }
+]
