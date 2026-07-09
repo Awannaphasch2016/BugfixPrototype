@@ -1,5 +1,10 @@
 # Handoff — Stage 2/3 planning context (from the Stage 0/1 planning session)
 
+> **SUPERSEDED (2026-07-09):** all open questions below were resolved in the
+> Stage 2 planning session. Current documents: `docs/stage-2-spec.md` (Stage 2,
+> floor-only), `docs/stage-3-handoff.md` (Stage 3 = the judgment dispatch),
+> `CONTEXT.md` (glossary). Kept for the decision rationale trail only.
+
 **How to use:** open a fresh session, run `/grill-with-docs` referencing this
 file. Everything under **Decided** carries its rationale — do not re-litigate
 without new information. Everything under **Open** is the grilling agenda.
