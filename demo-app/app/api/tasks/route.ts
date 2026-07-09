@@ -1,8 +1,10 @@
+import { requestLogger } from "@/lib/logger";
 import { readTasks, writeTasks } from "@/lib/store";
 import { newTaskId, type Task } from "@/lib/tasks";
 
 export async function GET(req: Request) {
   const status = new URL(req.url).searchParams.get("status");
+  const log = requestLogger("GET", "/api/tasks");
   let tasks = await readTasks();
   if (status === "active") {
     tasks = tasks.filter((t) => !t.completed);
@@ -10,12 +12,16 @@ export async function GET(req: Request) {
     tasks = tasks.filter((t) => !t.completed);
   }
   tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  log.info({ status: status ?? "all", count: tasks.length }, "listed tasks");
   return Response.json({ tasks });
 }
 
 export async function POST(req: Request) {
+  const log = requestLogger("POST", "/api/tasks");
   const body = await req.json();
+  log.info({ payload: body }, "creating task");
   if (!body.title || typeof body.title !== "string") {
+    log.warn("create rejected: missing title");
     return Response.json({ error: "title is required" }, { status: 400 });
   }
   const task: Task = {
@@ -28,5 +34,6 @@ export async function POST(req: Request) {
   const tasks = await readTasks();
   tasks.push(task);
   await writeTasks(tasks);
+  log.info({ taskId: task.id }, "task created");
   return Response.json({ task }, { status: 201 });
 }
