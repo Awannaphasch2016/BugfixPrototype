@@ -69,20 +69,26 @@ function TaskRow({
   );
 }
 
+const FILTERS = ["all", "active", "done"] as const;
+type Filter = (typeof FILTERS)[number];
+
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
 
-  async function refresh() {
-    const res = await fetch("/api/tasks");
+  async function refresh(f: Filter = filter) {
+    const query = f === "all" ? "" : `?status=${f}`;
+    const res = await fetch(`/api/tasks${query}`);
     const data = await res.json();
     setTasks(data.tasks);
   }
 
   useEffect(() => {
     refresh();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
@@ -130,6 +136,22 @@ export default function Home() {
           Add
         </button>
       </form>
+
+      <div className="mb-3 flex gap-1">
+        {FILTERS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`rounded-full px-3 py-1 text-sm capitalize ${
+              filter === f
+                ? "bg-zinc-900 text-white"
+                : "text-zinc-500 hover:bg-zinc-100"
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
 
       <ul className="rounded-lg border border-zinc-200 bg-white">
         {tasks.map((task) => (

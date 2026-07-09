@@ -1,8 +1,14 @@
 import { readTasks, writeTasks } from "@/lib/store";
 import { newTaskId, type Task } from "@/lib/tasks";
 
-export async function GET() {
-  const tasks = await readTasks();
+export async function GET(req: Request) {
+  const status = new URL(req.url).searchParams.get("status");
+  let tasks = await readTasks();
+  if (status === "active") {
+    tasks = tasks.filter((t) => !t.completed);
+  } else if (status === "done") {
+    tasks = tasks.filter((t) => !t.completed);
+  }
   tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   return Response.json({ tasks });
 }
