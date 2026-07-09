@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Task } from "@/lib/tasks";
+import type { Task, TaskPatch } from "@/lib/tasks";
 
 function DueBadge({ dueDate }: { dueDate: string | null }) {
   if (!dueDate) return null;
@@ -78,8 +78,8 @@ export default function Home() {
   const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
-  async function refresh(f: Filter = filter) {
-    const query = f === "all" ? "" : `?status=${f}`;
+  async function refresh() {
+    const query = filter === "all" ? "" : `?status=${filter}`;
     const res = await fetch(`/api/tasks${query}`);
     const data = await res.json();
     setTasks(data.tasks);
@@ -103,7 +103,7 @@ export default function Home() {
     refresh();
   }
 
-  async function patchTask(id: string, patch: Record<string, unknown>) {
+  async function patchTask(id: string, patch: TaskPatch) {
     await fetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
