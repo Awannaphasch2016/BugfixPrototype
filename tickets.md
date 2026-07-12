@@ -16,10 +16,14 @@ identical to the old tag's, force-move the tag (and main) forward.
 
 **Blocked by:** None — can start immediately.
 
-- [ ] The `demo-baseline` tag contains every harness and docs commit currently
-      on main.
-- [ ] `git diff <old-tag> demo-baseline -- demo-app` is empty.
-- [ ] A `reset.sh` run after this ticket would not delete any commit from main.
+- [x] The `demo-baseline` tag contains every harness and docs commit currently
+      on main. (The Stage 2b move was already done 2026-07-12 before this
+      ticket was picked up — the tag sat on the last Stage 2b harness commit;
+      the Stage 3 move, same date, carried it over this stage's commits.)
+- [x] `git diff <old-tag> demo-baseline -- demo-app` is empty. (Verified
+      against old tag 06a79a5 at the Stage 3 move.)
+- [x] A `reset.sh` run after this ticket would not delete any commit from
+      main. (main force-pushed to equal the new baseline exactly.)
 
 ## Operator note, end to end
 
@@ -70,7 +74,9 @@ as the three bug files — the user reviews the text before it is ever filed.
 handle a presentational report must exist before the request's issue can).
 
 - [ ] `harness/private/issues/request-4.md` exists, is user-reviewed, and is
-      gitignored with the rest of the answer key.
+      gitignored with the rest of the answer key. (Drafted 2026-07-12 and
+      gitignored; **user review still pending** — the gate before any reset
+      files it.)
 - [ ] After one reset: four open issues with clean timelines, the request
       created last (highest number), previous cycle's issues retired.
 - [ ] `/issues` in the chat shows four cards with the request at the bottom.
@@ -98,7 +104,8 @@ floor.
 **Blocked by:** Rebaseline demo-baseline over the Stage 2b commits; Operator
 note, end to end; Request #4 filed by reset.
 
-- [ ] Tag moved forward over all Stage 3 commits before the first reset.
+- [x] Tag moved forward over all Stage 3 commits before the first reset
+      (2026-07-12, together with ticket 1's move — see above).
 - [ ] Bugs 2 and 3: transcripts audited — red-then-green route-seam tests,
       no use of the styling exception, no reads outside demo-app.
 - [ ] Bug 1's setup pre-run re-verified under the amended prompt; rehearsal
