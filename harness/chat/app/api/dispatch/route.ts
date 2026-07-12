@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { runnerCmd } from "@/lib/config";
+import { ghCmd, runnerCmd } from "@/lib/config";
 import { errorResponse } from "@/lib/http";
 import {
   acquireRunLock,
@@ -9,7 +9,10 @@ import {
 import { restoreRuntimeDirtiedFiles } from "@/lib/restore";
 import { run } from "@/lib/shell";
 
-const dispatchSchema = z.object({ issue: z.number().int().positive() });
+const dispatchSchema = z.object({
+  issue: z.number().int().positive(),
+  note: z.string().optional(),
+});
 
 const PR_URL = /https:\/\/github\.com\/\S+\/pull\/(\d+)/g;
 
@@ -22,11 +25,19 @@ export async function POST(req: Request) {
     return Response.json({ error: "a run is already in flight" }, { status: 409 });
   }
   const issue = body.data.issue;
+  // Empty-only normalization: trim, and an empty field leaves no trace — no
+  // comment, no runner argument. Anything else is the note, verbatim.
+  const note = body.data.note?.trim() || undefined;
   recordDispatch({ status: "running", issue });
 
   try {
     await restoreRuntimeDirtiedFiles();
-    const output = await run(runnerCmd(), [String(issue)]);
+    if (note) {
+      // The judgment enters the record before the run starts; if the comment
+      // fails to post, the dispatch aborts and the runner is never spawned.
+      await run(ghCmd(), ["issue", "comment", String(issue), "--body", note]);
+    }
+    const output = await run(runnerCmd(), note ? [String(issue), note] : [String(issue)]);
 
     const prUrl = [...output.matchAll(PR_URL)].at(-1);
     if (!prUrl) {

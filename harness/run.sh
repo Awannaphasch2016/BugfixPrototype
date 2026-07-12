@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # One-shot fixer runner: GitHub issue number in, open PR out.
 #
-#   harness/run.sh <issue-number>
+#   harness/run.sh <issue-number> [note]
+#
+# The optional note is the operator's judgment, already posted to the issue as
+# a comment by the dispatcher. It is spliced into the fixed prompt as a "note
+# from the team" section — added context between the bug report and the
+# contract, never a replacement for either.
 #
 # The agent only diagnoses, tests, and fixes inside $APP_DIR. This script owns
 # every git operation (branch, commit, push, PR) so no plumbing step depends on
@@ -12,7 +17,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="demo-app" # config point: the directory the fixer agent is scoped to
 cd "$REPO_ROOT"
 
-ISSUE="${1:?usage: harness/run.sh <issue-number>}"
+ISSUE="${1:?usage: harness/run.sh <issue-number> [note]}"
+NOTE="${2-}"
 
 abort() {
   echo "ERROR: $1" >&2
@@ -37,6 +43,18 @@ BRANCH="fix/issue-$ISSUE"
 git branch -q -D "$BRANCH" 2>/dev/null || true
 git checkout -q -b "$BRANCH"
 
+# A note becomes its own section between the bug report and the contract, so
+# it reads as reporting context and the binding rules stay last. No note, no
+# section: the prompt is byte-identical to the rehearsed one.
+NOTE_SECTION=""
+if [[ -n "$NOTE" ]]; then
+  NOTE_SECTION="## Note from the team
+
+$NOTE
+
+"
+fi
+
 PROMPT=$(cat <<EOF
 You are a senior engineer fixing a reported bug in this task-management app. This directory is the entire application.
 
@@ -44,10 +62,10 @@ You are a senior engineer fixing a reported bug in this task-management app. Thi
 
 $BODY
 
-## Your job
+${NOTE_SECTION}## Your job
 
 1. Investigate and find the root cause. Read the code; if the report mentions application logs, interrogate them (grep, jq) and correlate what you find with the code paths involved.
-2. Write a regression test at the API route-handler seam (Vitest, alongside the existing tests in tests/) that reproduces the reported behavior. Run it and confirm it FAILS against the current code for the reported reason.
+2. Write a regression test at the API route-handler seam (Vitest, alongside the existing tests in tests/) that reproduces the reported behavior. Run it and confirm it FAILS against the current code for the reported reason. Exception: if the fix is purely presentational (styling only — no API route's behavior changes), write no new test; instead your "## Regression test" section must explain in one or two sentences why no route-level test can capture the change.
 3. Implement the smallest correct fix. Do not refactor beyond it.
 4. Run the full suite (npm test) and make sure everything passes.
 5. Do not run any git commands; do not touch anything outside this directory.

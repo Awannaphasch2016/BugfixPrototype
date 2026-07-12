@@ -42,10 +42,11 @@ for i in $(jq -r '.[] | select(.state == "CLOSED" and .stateReason == "COMPLETED
   gh issue close "$i" --reason "not planned"
 done
 
-# File the fresh cycle in demo order, so issue numbers ascend 1 → 2 → 3
-# within the cycle. Texts live in the answer key (title on the first line,
-# body after) — the verbatim "client-filed" reports never enter a commit.
-for f in harness/private/issues/bug-{1,2,3}.md; do
+# File the fresh cycle in demo order — bug 1 → bug 2 → bug 3 → request — so
+# issue numbers ascend within the cycle and the request sits last in the
+# ascending /issues queue. Texts live in the answer key (title on the first
+# line, body after) — the verbatim "client-filed" reports never enter a commit.
+for f in harness/private/issues/bug-{1,2,3}.md harness/private/issues/request-4.md; do
   [[ -f "$f" ]] || { echo "ERROR: missing answer-key issue file: $f" >&2; exit 1; }
   TITLE=$(head -n 1 "$f")
   # body = everything after the title line, minus the leading blank line(s)

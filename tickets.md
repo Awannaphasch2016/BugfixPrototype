@@ -41,17 +41,19 @@ mandatory `## Regression test` section, why no route-level test applies).
 
 - [ ] Chat walkthrough: Fix-this expands the card; empty-field dispatch works
       as before; a typed note appears as a comment on the real issue.
-- [ ] Route-seam test: dispatch with a note spawns the comment command and
+- [x] Route-seam test: dispatch with a note spawns the comment command and
       passes the note verbatim as the runner's second argument.
-- [ ] Route-seam test: dispatch with an empty or whitespace-only field spawns
+- [x] Route-seam test: dispatch with an empty or whitespace-only field spawns
       no comment command and passes no second argument.
-- [ ] Route-seam test: when the comment command fails, the dispatch aborts
+- [x] Route-seam test: when the comment command fails, the dispatch aborts
       and the runner is never spawned.
-- [ ] The runner's prompt, run with a note argument, contains the note in the
+- [x] The runner's prompt, run with a note argument, contains the note in the
       decided position; run without one, it is byte-identical to the current
-      rehearsed prompt except for the amendment sentence.
-- [ ] The amendment sentence appears in the contract for every run, with or
-      without a note.
+      rehearsed prompt except for the amendment sentence. (Verified 2026-07-12
+      by capturing the prompt through stubbed `gh`/`claude` in a scratch clone
+      and byte-diffing old vs. new runner output.)
+- [x] The amendment sentence appears in the contract for every run, with or
+      without a note. (Same byte-diff verification.)
 
 ## Request #4 filed by reset
 

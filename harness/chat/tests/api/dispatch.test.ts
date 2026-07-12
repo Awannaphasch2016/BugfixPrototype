@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { POST as dispatch } from "@/app/api/dispatch/route";
 import { freshStubEnv, jsonPost, spawnedCommands, writeStub } from "@/tests/helpers";
 
-function dispatchIssue(issue: unknown) {
-  return jsonPost(dispatch, "http://localhost/api/dispatch", { issue });
+function dispatchIssue(issue: unknown, note?: string) {
+  return jsonPost(
+    dispatch,
+    "http://localhost/api/dispatch",
+    note === undefined ? { issue } : { issue, note },
+  );
 }
 
 beforeEach(async () => {
@@ -51,6 +55,36 @@ describe("POST /api/dispatch", () => {
     const res = await dispatchIssue("2; rm -rf /");
     expect(res.status).toBe(400);
     expect(await spawnedCommands()).toEqual([]);
+  });
+
+  it("posts a note as an issue comment, then passes it verbatim as the runner's second argument", async () => {
+    const res = await dispatchIssue(2, "use green for the text in the todo list");
+    expect(res.status).toBe(200);
+    expect(await spawnedCommands()).toEqual([
+      "git checkout HEAD -- demo-app/data/tasks.json demo-app/logs/app.log",
+      "gh issue comment 2 --body use green for the text in the todo list",
+      "runner 2 use green for the text in the todo list",
+    ]);
+  });
+
+  it("trims the note; whitespace-only dispatches exactly as today — no comment, no second argument", async () => {
+    const res = await dispatchIssue(2, "  \n\t ");
+    expect(res.status).toBe(200);
+    expect(await spawnedCommands()).toEqual([
+      "git checkout HEAD -- demo-app/data/tasks.json demo-app/logs/app.log",
+      "runner 2",
+    ]);
+  });
+
+  it("aborts the dispatch when the comment fails to post: the runner never starts", async () => {
+    process.env.CHAT_GH_CMD = await writeStub("gh", "exit 1");
+    const res = await dispatchIssue(2, "use green for the text in the todo list");
+    expect(res.status).toBe(500);
+    const commands = await spawnedCommands();
+    expect(commands.some((c) => c.startsWith("runner"))).toBe(false);
+
+    // the lock is freed: a follow-up dispatch goes through
+    expect((await dispatchIssue(2)).status).toBe(200);
   });
 
   it("returns an honest error when the runner fails, and frees the lock", async () => {

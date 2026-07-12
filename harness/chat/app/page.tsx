@@ -61,6 +61,10 @@ export default function Home() {
   const [inFlight, setInFlight] = useState(false);
   const [activeIssue, setActiveIssue] = useState<number | null>(null);
   const [dispatchedIssues, setDispatchedIssues] = useState<Set<number>>(new Set());
+  // Fix-this expands the card in place to an optional note field + Dispatch;
+  // one card expanded at a time, draft discarded when expansion moves on.
+  const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
 
   function add(msg: DistributiveOmit<ChatMessage, "id">) {
     const id = nextId.current++;
@@ -90,13 +94,16 @@ export default function Home() {
   // requests at ~100s) can kill it mid-run while the run keeps going
   // server-side — so on a transport-level failure we recover the outcome by
   // polling the status route. A localhost demo never takes this path.
-  async function dispatchAndAwait(issue: number): Promise<{ prUrl: string; prNumber: number }> {
+  async function dispatchAndAwait(
+    issue: number,
+    note?: string,
+  ): Promise<{ prUrl: string; prNumber: number }> {
     let res: Response;
     try {
       res = await fetch("/api/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ issue }),
+        body: JSON.stringify(note ? { issue, note } : { issue }),
       });
     } catch {
       return awaitViaStatus(issue);
@@ -184,15 +191,21 @@ export default function Home() {
 
   // Dispatch blocks until the runner exits; the open request is the
   // notification channel, so the PR card lands at the true moment of readiness.
-  async function handleFix(issue: Issue) {
+  async function handleDispatch(issue: Issue) {
+    // Empty-only normalization, mirrored server-side: an empty field
+    // dispatches exactly as before the note existed — no trace anywhere.
+    const note = noteDraft.trim() || undefined;
+    setExpandedIssue(null);
+    setNoteDraft("");
     setInFlight(true);
     setActiveIssue(issue.number);
     addBot(
-      `On it — dispatching the fixer agent on issue #${issue.number}. ` +
+      `On it — dispatching the fixer agent on issue #${issue.number}` +
+        (note ? " with your note on the record. " : ". ") +
         "I'll post the PR here the moment it's ready.",
     );
     try {
-      const { prUrl, prNumber } = await dispatchAndAwait(issue.number);
+      const { prUrl, prNumber } = await dispatchAndAwait(issue.number, note);
       setDispatchedIssues((prev) => new Set(prev).add(issue.number));
       add({ kind: "pr", issue, prNumber, prUrl, state: "ready" });
     } catch (error) {
@@ -305,17 +318,40 @@ export default function Home() {
                     view issue
                   </a>
                 </div>
-                <button
-                  className="btn"
-                  disabled={inFlight || dispatchedIssues.has(issue.number)}
-                  onClick={() => handleFix(issue)}
-                >
-                  {activeIssue === issue.number
-                    ? "Working on it…"
-                    : dispatchedIssues.has(issue.number)
-                      ? "PR ready — see below"
-                      : "Fix this"}
-                </button>
+                {expandedIssue === issue.number && !dispatchedIssues.has(issue.number) ? (
+                  <div className="note-form">
+                    <textarea
+                      className="note-field"
+                      rows={3}
+                      placeholder="Optional note for the fixer — anything only the team knows. Leave empty to dispatch as-is."
+                      value={noteDraft}
+                      onChange={(e) => setNoteDraft(e.target.value)}
+                      disabled={inFlight}
+                    />
+                    <button
+                      className="btn"
+                      disabled={inFlight}
+                      onClick={() => handleDispatch(issue)}
+                    >
+                      Dispatch
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="btn"
+                    disabled={inFlight || dispatchedIssues.has(issue.number)}
+                    onClick={() => {
+                      setExpandedIssue(issue.number);
+                      setNoteDraft("");
+                    }}
+                  >
+                    {activeIssue === issue.number
+                      ? "Working on it…"
+                      : dispatchedIssues.has(issue.number)
+                        ? "PR ready — see below"
+                        : "Fix this"}
+                  </button>
+                )}
               </div>
             ))}
           </>
