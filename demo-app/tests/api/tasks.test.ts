@@ -88,6 +88,20 @@ describe("PATCH /api/tasks/:id", () => {
     expect(list.tasks[0].dueDate).toBe("2026-07-12");
   });
 
+  it("keeps the task when the merged update fails validation", async () => {
+    // POST does not enforce the 100-char title max, so an overlong title can
+    // exist in the store; marking it done must not delete it.
+    const { task } = await (
+      await createTask({ title: "x".repeat(120) })
+    ).json();
+    const res = await patchTask(task.id, { completed: true });
+
+    const list = await (await listTasks()).json();
+    const ids = list.tasks.map((t: { id: string }) => t.id);
+    expect(ids).toContain(task.id);
+    expect(res.status).toBe(400);
+  });
+
   it("404s for an unknown task id", async () => {
     const res = await patchTask("does-not-exist", { completed: true });
     expect(res.status).toBe(404);

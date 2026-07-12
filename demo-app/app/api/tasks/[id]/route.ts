@@ -19,19 +19,19 @@ export async function PATCH(
     return Response.json({ error: "task not found" }, { status: 404 });
   }
 
-  const [existing] = tasks.splice(index, 1);
+  const existing = tasks[index];
   const updated: Task = {
     ...existing,
     title: typeof body.title === "string" ? body.title.trim() : existing.title,
     completed: typeof body.completed === "boolean" ? body.completed : existing.completed,
     dueDate: body.dueDate !== undefined ? body.dueDate : existing.dueDate,
   };
-  try {
-    taskSchema.parse(updated);
-    tasks.push(updated);
-  } catch (err) {
-    log.error({ err, taskId: id }, "task update failed validation");
+  const parsed = taskSchema.safeParse(updated);
+  if (!parsed.success) {
+    log.error({ err: parsed.error, taskId: id }, "task update failed validation");
+    return Response.json({ error: "invalid task update" }, { status: 400 });
   }
+  tasks[index] = updated;
   await writeTasks(tasks);
   log.info({ taskId: id }, "task updated");
   return Response.json({ task: updated });
