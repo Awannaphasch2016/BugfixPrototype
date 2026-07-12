@@ -15,6 +15,11 @@ git checkout -q main
 git fetch -q origin --tags
 git reset -q --hard "$TAG"
 git clean -qfd
+# git clean spares gitignored files, but the demo-app's .next dev-server
+# cache is state too: chunks compiled from a previous cycle's fix branch
+# survive the rewind and leak that fix (class names, styles) into the next
+# fixer run's view of the tree. Fresh cycle = fresh build cache.
+rm -rf demo-app/.next
 git push --force origin main
 
 for pr in $(gh pr list --state open --json number -q '.[].number'); do
