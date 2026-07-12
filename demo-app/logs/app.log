@@ -105,3 +105,60 @@
 {"level":30,"time":1783562799398,"pid":33619,"hostname":"codespaces-f0b521","reqId":"a08vujs4","method":"POST","route":"/api/tasks","payload":{"title":"Restock coffee beans","dueDate":"2026-07-14"},"msg":"creating task"}
 {"level":30,"time":1783562799403,"pid":33619,"hostname":"codespaces-f0b521","reqId":"a08vujs4","method":"POST","route":"/api/tasks","taskId":"t9c7d5yc","msg":"task created"}
 {"level":30,"time":1783562799570,"pid":33619,"hostname":"codespaces-f0b521","reqId":"qp6s8a0z","method":"GET","route":"/api/tasks","status":"all","count":20,"msg":"listed tasks"}
+{"level":30,"time":1783863604406,"pid":120360,"hostname":"codespaces-f0b521","reqId":"om0rmyuw","method":"POST","route":"/api/tasks","payload":{"title":"File expense report","dueDate":"2026-08-01"},"msg":"creating task"}
+{"level":30,"time":1783863604424,"pid":120360,"hostname":"codespaces-f0b521","reqId":"om0rmyuw","method":"POST","route":"/api/tasks","taskId":"v37q79do","msg":"task created"}
+{"level":30,"time":1783863604425,"pid":120360,"hostname":"codespaces-f0b521","reqId":"hyf4p97a","method":"PATCH","route":"/api/tasks/:id","taskId":"v37q79do","payload":{"completed":true},"msg":"updating task"}
+{"level":30,"time":1783863604430,"pid":120360,"hostname":"codespaces-f0b521","reqId":"hyf4p97a","method":"PATCH","route":"/api/tasks/:id","taskId":"v37q79do","msg":"task updated"}
+{"level":30,"time":1783863604431,"pid":120360,"hostname":"codespaces-f0b521","reqId":"14egdvat","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863604441,"pid":120360,"hostname":"codespaces-f0b521","reqId":"64baaxyr","method":"POST","route":"/api/tasks","payload":{"title":"File expense report","dueDate":"2026-08-01"},"msg":"creating task"}
+{"level":30,"time":1783863604441,"pid":120360,"hostname":"codespaces-f0b521","reqId":"64baaxyr","method":"POST","route":"/api/tasks","taskId":"ljeiyyfw","msg":"task created"}
+{"level":30,"time":1783863604442,"pid":120360,"hostname":"codespaces-f0b521","reqId":"n67g7946","method":"PATCH","route":"/api/tasks/:id","taskId":"ljeiyyfw","payload":{"dueDate":null},"msg":"updating task"}
+{"level":30,"time":1783863604443,"pid":120360,"hostname":"codespaces-f0b521","reqId":"n67g7946","method":"PATCH","route":"/api/tasks/:id","taskId":"ljeiyyfw","msg":"task updated"}
+{"level":30,"time":1783863604444,"pid":120360,"hostname":"codespaces-f0b521","reqId":"n0snebxn","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624010,"pid":121928,"hostname":"codespaces-f0b521","reqId":"p2nuaftv","method":"POST","route":"/api/tasks","payload":{"title":"Write launch notes"},"msg":"creating task"}
+{"level":30,"time":1783863624026,"pid":121928,"hostname":"codespaces-f0b521","reqId":"p2nuaftv","method":"POST","route":"/api/tasks","taskId":"sg12pesa","msg":"task created"}
+{"level":30,"time":1783863624032,"pid":121928,"hostname":"codespaces-f0b521","reqId":"edoojf2d","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624045,"pid":121928,"hostname":"codespaces-f0b521","reqId":"vkggg916","method":"POST","route":"/api/tasks","payload":{"dueDate":"2026-08-01"},"msg":"creating task"}
+{"level":40,"time":1783863624045,"pid":121928,"hostname":"codespaces-f0b521","reqId":"vkggg916","method":"POST","route":"/api/tasks","msg":"create rejected: missing title"}
+{"level":30,"time":1783863624047,"pid":121928,"hostname":"codespaces-f0b521","reqId":"aadfcgzy","method":"POST","route":"/api/tasks","payload":{"title":"Renew SSL cert","dueDate":"2026-08-01"},"msg":"creating task"}
+{"level":30,"time":1783863624047,"pid":121928,"hostname":"codespaces-f0b521","reqId":"aadfcgzy","method":"POST","route":"/api/tasks","taskId":"02gfx8i6","msg":"task created"}
+{"level":30,"time":1783863624048,"pid":121928,"hostname":"codespaces-f0b521","reqId":"gjk1sfyp","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624051,"pid":121928,"hostname":"codespaces-f0b521","reqId":"qjffj8qo","method":"POST","route":"/api/tasks","payload":{"title":"Draft agenda"},"msg":"creating task"}
+{"level":30,"time":1783863624053,"pid":121928,"hostname":"codespaces-f0b521","reqId":"qjffj8qo","method":"POST","route":"/api/tasks","taskId":"gw8pf7zl","msg":"task created"}
+{"level":30,"time":1783863624054,"pid":121928,"hostname":"codespaces-f0b521","reqId":"qe2x25kb","method":"PATCH","route":"/api/tasks/:id","taskId":"gw8pf7zl","payload":{"title":"Draft standup agenda"},"msg":"updating task"}
+{"level":30,"time":1783863624059,"pid":121928,"hostname":"codespaces-f0b521","reqId":"qe2x25kb","method":"PATCH","route":"/api/tasks/:id","taskId":"gw8pf7zl","msg":"task updated"}
+{"level":30,"time":1783863624060,"pid":121928,"hostname":"codespaces-f0b521","reqId":"tvwtpinr","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624062,"pid":121928,"hostname":"codespaces-f0b521","reqId":"1zxif3d6","method":"POST","route":"/api/tasks","payload":{"title":"Pay invoice"},"msg":"creating task"}
+{"level":30,"time":1783863624063,"pid":121928,"hostname":"codespaces-f0b521","reqId":"1zxif3d6","method":"POST","route":"/api/tasks","taskId":"gbha9tp3","msg":"task created"}
+{"level":30,"time":1783863624064,"pid":121928,"hostname":"codespaces-f0b521","reqId":"1oau166q","method":"PATCH","route":"/api/tasks/:id","taskId":"gbha9tp3","payload":{"completed":true},"msg":"updating task"}
+{"level":30,"time":1783863624065,"pid":121928,"hostname":"codespaces-f0b521","reqId":"1oau166q","method":"PATCH","route":"/api/tasks/:id","taskId":"gbha9tp3","msg":"task updated"}
+{"level":30,"time":1783863624066,"pid":121928,"hostname":"codespaces-f0b521","reqId":"2vj67xtu","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624067,"pid":121928,"hostname":"codespaces-f0b521","reqId":"t0idcr4j","method":"PATCH","route":"/api/tasks/:id","taskId":"gbha9tp3","payload":{"completed":false},"msg":"updating task"}
+{"level":30,"time":1783863624068,"pid":121928,"hostname":"codespaces-f0b521","reqId":"t0idcr4j","method":"PATCH","route":"/api/tasks/:id","taskId":"gbha9tp3","msg":"task updated"}
+{"level":30,"time":1783863624070,"pid":121928,"hostname":"codespaces-f0b521","reqId":"gnz5xrnc","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624071,"pid":121928,"hostname":"codespaces-f0b521","reqId":"qay26ini","method":"POST","route":"/api/tasks","payload":{"title":"File expense report","dueDate":"2026-08-01"},"msg":"creating task"}
+{"level":30,"time":1783863624073,"pid":121928,"hostname":"codespaces-f0b521","reqId":"qay26ini","method":"POST","route":"/api/tasks","taskId":"hkmy2z7a","msg":"task created"}
+{"level":30,"time":1783863624073,"pid":121928,"hostname":"codespaces-f0b521","reqId":"3ah8jooy","method":"PATCH","route":"/api/tasks/:id","taskId":"hkmy2z7a","payload":{"completed":true},"msg":"updating task"}
+{"level":30,"time":1783863624075,"pid":121928,"hostname":"codespaces-f0b521","reqId":"3ah8jooy","method":"PATCH","route":"/api/tasks/:id","taskId":"hkmy2z7a","msg":"task updated"}
+{"level":30,"time":1783863624076,"pid":121928,"hostname":"codespaces-f0b521","reqId":"b8occsci","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624078,"pid":121928,"hostname":"codespaces-f0b521","reqId":"pbb73sgv","method":"POST","route":"/api/tasks","payload":{"title":"File expense report","dueDate":"2026-08-01"},"msg":"creating task"}
+{"level":30,"time":1783863624084,"pid":121928,"hostname":"codespaces-f0b521","reqId":"pbb73sgv","method":"POST","route":"/api/tasks","taskId":"swu61j15","msg":"task created"}
+{"level":30,"time":1783863624085,"pid":121928,"hostname":"codespaces-f0b521","reqId":"coehkbd9","method":"PATCH","route":"/api/tasks/:id","taskId":"swu61j15","payload":{"dueDate":null},"msg":"updating task"}
+{"level":30,"time":1783863624087,"pid":121928,"hostname":"codespaces-f0b521","reqId":"coehkbd9","method":"PATCH","route":"/api/tasks/:id","taskId":"swu61j15","msg":"task updated"}
+{"level":30,"time":1783863624087,"pid":121928,"hostname":"codespaces-f0b521","reqId":"r6r14w29","method":"GET","route":"/api/tasks","status":"all","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624088,"pid":121928,"hostname":"codespaces-f0b521","reqId":"i63aivur","method":"PATCH","route":"/api/tasks/:id","taskId":"does-not-exist","payload":{"completed":true},"msg":"updating task"}
+{"level":40,"time":1783863624090,"pid":121928,"hostname":"codespaces-f0b521","reqId":"i63aivur","method":"PATCH","route":"/api/tasks/:id","taskId":"does-not-exist","msg":"task not found"}
+{"level":30,"time":1783863624092,"pid":121928,"hostname":"codespaces-f0b521","reqId":"kk89kuch","method":"POST","route":"/api/tasks","payload":{"title":"Ship v1"},"msg":"creating task"}
+{"level":30,"time":1783863624094,"pid":121928,"hostname":"codespaces-f0b521","reqId":"kk89kuch","method":"POST","route":"/api/tasks","taskId":"5gxswvrj","msg":"task created"}
+{"level":30,"time":1783863624094,"pid":121928,"hostname":"codespaces-f0b521","reqId":"pb2xk4qj","method":"POST","route":"/api/tasks","payload":{"title":"Ship v2"},"msg":"creating task"}
+{"level":30,"time":1783863624096,"pid":121928,"hostname":"codespaces-f0b521","reqId":"pb2xk4qj","method":"POST","route":"/api/tasks","taskId":"lr9bq2kz","msg":"task created"}
+{"level":30,"time":1783863624096,"pid":121928,"hostname":"codespaces-f0b521","reqId":"dxvagd34","method":"PATCH","route":"/api/tasks/:id","taskId":"5gxswvrj","payload":{"completed":true},"msg":"updating task"}
+{"level":30,"time":1783863624101,"pid":121928,"hostname":"codespaces-f0b521","reqId":"dxvagd34","method":"PATCH","route":"/api/tasks/:id","taskId":"5gxswvrj","msg":"task updated"}
+{"level":30,"time":1783863624105,"pid":121928,"hostname":"codespaces-f0b521","reqId":"0ysrgs1v","method":"GET","route":"/api/tasks","status":"active","count":1,"msg":"listed tasks"}
+{"level":30,"time":1783863624109,"pid":121928,"hostname":"codespaces-f0b521","reqId":"i8kgwipe","method":"POST","route":"/api/tasks","payload":{"title":"Ship v1"},"msg":"creating task"}
+{"level":30,"time":1783863624112,"pid":121928,"hostname":"codespaces-f0b521","reqId":"i8kgwipe","method":"POST","route":"/api/tasks","taskId":"6zwpkbu6","msg":"task created"}
+{"level":30,"time":1783863624113,"pid":121928,"hostname":"codespaces-f0b521","reqId":"efw6ievg","method":"POST","route":"/api/tasks","payload":{"title":"Ship v2"},"msg":"creating task"}
+{"level":30,"time":1783863624114,"pid":121928,"hostname":"codespaces-f0b521","reqId":"efw6ievg","method":"POST","route":"/api/tasks","taskId":"2g34m3km","msg":"task created"}
+{"level":30,"time":1783863624115,"pid":121928,"hostname":"codespaces-f0b521","reqId":"c9957w8j","method":"PATCH","route":"/api/tasks/:id","taskId":"6zwpkbu6","payload":{"completed":true},"msg":"updating task"}
+{"level":30,"time":1783863624115,"pid":121928,"hostname":"codespaces-f0b521","reqId":"c9957w8j","method":"PATCH","route":"/api/tasks/:id","taskId":"6zwpkbu6","msg":"task updated"}
+{"level":30,"time":1783863624117,"pid":121928,"hostname":"codespaces-f0b521","reqId":"d1rpp2t6","method":"GET","route":"/api/tasks","status":"done","count":1,"msg":"listed tasks"}
