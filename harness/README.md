@@ -5,21 +5,25 @@ directory; this directory owns everything deterministic.
 
 ## Scripts
 
-- `run.sh <issue-number>` — the one visible demo action: fetches the issue,
-  branches, runs the fixer agent (Claude Code, non-interactive, scoped to
-  `demo-app/`), then commits, pushes, and opens the PR itself. Fails cleanly
-  (nothing pushed) if the agent errors, changes nothing, or touches files
-  outside the app. Agent output and session transcript land in
-  `harness/private/` for the rehearsal audit.
+- `run.sh <issue-number> [note]` — the one visible demo action: fetches the
+  issue, branches, runs the fixer agent (Claude Code, non-interactive, scoped
+  to `demo-app/`), then commits, pushes, and opens the PR itself. The optional
+  note (the operator's judgment, already on the issue as a comment by the time
+  the runner starts) is spliced into the fixed prompt as a "note from the
+  team" section between the bug report and the contract — added context, never
+  a replacement. Fails cleanly (nothing pushed) if the agent errors, changes
+  nothing, or touches files outside the app. Agent output and session
+  transcript land in `harness/private/` for the rehearsal audit.
 - `reset.sh` — starts a fresh demo cycle: force-resets main (local + GitHub)
   to the `demo-baseline` tag, closes open PRs, deletes `fix/*` branches,
   retires the previous cycle's issues (closed as "not planned"; completed ones
   are reopened first so the close reason can be rewritten, and issues already
-  retired are never touched again), then files three fresh issues with clean
-  timelines, in demo order so their numbers ascend. Issue texts are read at
-  filing time from the answer key (`harness/private/issues/bug-<n>.md`, title
-  on the first line, body after), so the verbatim reports never enter a
-  commit. Nothing is ever deleted — retired issues and merged PRs stay
+  retired are never touched again), then files four fresh issues with clean
+  timelines — bug 1 → bug 2 → bug 3 → request #4, in demo order so their
+  numbers ascend and the request sits last in the queue. Issue texts are read
+  at filing time from the answer key (`harness/private/issues/bug-<n>.md` and
+  `request-4.md`, title on the first line, body after), so the verbatim
+  reports never enter a commit. Nothing is ever deleted — retired issues and merged PRs stay
   browsable for later audit. Run between rehearsals and before the live demo.
 - `setup.sh` — pre-demo step after `reset.sh`: finds bug 1's fresh issue by
   its exact answer-key title (issue numbers change every cycle), runs it
@@ -40,8 +44,13 @@ merged fix-branch PR, each card badged **autofixed** or **human-approved**
 from the `autofixed` label — both lanes on one screen), and `/autofixed` (the
 no-human-in-the-loop subset). Old command names get the graceful fallback,
 not silent aliases. **Fix
-this** on an issue card restores the two runtime-dirtied demo-app data files
-and runs `run.sh` (one blocking request — the response is the PR card);
+this** on an issue card expands it in place to an optional operator-note field
+plus **Dispatch**. Dispatching restores the two runtime-dirtied demo-app data
+files and runs `run.sh` (one blocking request — the response is the PR card);
+an empty field (after trimming) leaves no trace — the rehearsed prompt runs
+byte-identical; any text is first posted to the issue as a comment (a failed
+comment aborts the dispatch — the runner never starts) and then passed to
+`run.sh` as its optional second argument;
 **Merge** merges the real PR via `gh` and fast-forwards the local main so the
 demo app hot-reloads with the fix. One run at a time; chat state is in-memory
 and disposable. GitHub stays the system of record — the chat links to real
@@ -67,10 +76,14 @@ are identified by their answer-key titles, never by issue number — the
 numbers change every cycle.
 
 Per bug: show the symptom in the UI → `/issues` in the chat →
-**Fix this** → walk the autofix lane while the run blocks → PR card arrives →
-glance at the PR on GitHub (diagnosis narrative, diff, red→green regression
-test) → **Merge** in the chat → show the UI fixed. The full runbook (setup,
-choreography, recovery ladder) lives in `harness/private/`.
+**Fix this** → leave the note field empty → **Dispatch** → walk the autofix
+lane while the run blocks → PR card arrives → glance at the PR on GitHub
+(diagnosis narrative, diff, red→green regression test) → **Merge** in the
+chat → show the UI fixed. After bug 3, the request (bottom card) opens the
+assisted lane: **Fix this** → paste the rehearsed note verbatim →
+**Dispatch** — the note lands on the issue as a comment before the run
+starts. The full runbook (setup, choreography, recovery ladder) lives in
+`harness/private/`.
 
 ## Rehearsal ritual (definition of demo-ready, per bug)
 

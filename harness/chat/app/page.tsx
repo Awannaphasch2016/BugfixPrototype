@@ -323,7 +323,7 @@ export default function Home() {
                     <textarea
                       className="note-field"
                       rows={3}
-                      placeholder="Optional note for the fixer — anything only the team knows. Leave empty to dispatch as-is."
+                      placeholder="Optional note for the fixer agent — anything only the team knows. Leave empty to dispatch as-is."
                       value={noteDraft}
                       onChange={(e) => setNoteDraft(e.target.value)}
                       disabled={inFlight}
