@@ -73,13 +73,15 @@ as the three bug files — the user reviews the text before it is ever filed.
 **Blocked by:** Operator note, end to end (the prompt contract that can
 handle a presentational report must exist before the request's issue can).
 
-- [ ] `harness/private/issues/request-4.md` exists, is user-reviewed, and is
-      gitignored with the rest of the answer key. (Drafted 2026-07-12 and
-      gitignored; **user review still pending** — the gate before any reset
-      files it.)
-- [ ] After one reset: four open issues with clean timelines, the request
+- [x] `harness/private/issues/request-4.md` exists, is user-reviewed, and is
+      gitignored with the rest of the answer key. (Drafted and user-reviewed
+      2026-07-12.)
+- [x] After one reset: four open issues with clean timelines, the request
       created last (highest number), previous cycle's issues retired.
-- [ ] `/issues` in the chat shows four cards with the request at the bottom.
+      (2026-07-12: reset filed #17–#20, request is #20; #11–#13 retired as
+      "not planned".)
+- [x] `/issues` in the chat shows four cards with the request at the bottom.
+      (Verified against the live route.)
 - [ ] The next reset retires the request along with the bugs.
 
 ## Re-rehearsal pass — the demo-ready gate
