@@ -43,10 +43,16 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
   files fresh issues; a finished cycle's issues are retired.
 - **Retired issue** — an issue from a finished demo cycle, closed as
   not-planned. Belongs to no lane; kept forever for the audit trail.
+- **Request** — a filed issue whose complaint is not a defect: nothing is
+  planted, nothing is broken; only the in-character complaint text is authored.
+  Contrast with a planted bug, which has a root cause, a log signature, and a
+  failing test waiting to be written. (Distinct from a build ticket on the
+  `docs/` tracker — requests are demo scenery on GitHub Issues.)
 - **Operator note** — optional free-text context a human attaches at dispatch, for
-  when the issue alone is missing something the human knows. Appended to the fixer
-  agent's fixed prompt as added context; a bare go-word ("do it") attaches nothing
-  and the fixed prompt runs untouched. Never a replacement for the fixed prompt.
+  when the issue alone is missing something the human knows. Added to the fixer
+  agent's fixed prompt as reporting context and posted to the issue as a comment,
+  so the judgment enters the record; an empty field attaches nothing and the fixed
+  prompt runs untouched. Never a replacement for the fixed prompt.
 - **Routing policy** — the rule deciding which lane an issue lands in. Policy, not
   AI: validated bug classes autofix, everything else queues. Widening the policy as
   trust builds is the engagement's growth story.
