@@ -37,7 +37,7 @@ function TaskRow({
   }
 
   return (
-    <li className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
+    <li className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3 odd:bg-zinc-900/50 hover:bg-zinc-900">
       <input
         type="checkbox"
         checked={task.completed}
@@ -57,7 +57,7 @@ function TaskRow({
         <span
           onClick={() => setEditing(true)}
           className={`flex-1 cursor-text text-sm ${
-            task.completed ? "text-zinc-500 line-through" : "text-zinc-100"
+            task.completed ? "text-green-300/50 line-through" : "text-green-300"
           }`}
           title="Click to rename"
         >
@@ -153,7 +153,7 @@ export default function Home() {
         ))}
       </div>
 
-      <ul className="rounded-lg border border-zinc-800 bg-zinc-950">
+      <ul className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
         {tasks.map((task) => (
           <TaskRow
             key={task.id}
