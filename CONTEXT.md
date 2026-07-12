@@ -23,6 +23,23 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
   prior art, not a failure.
 - **Dispatch** — the human act of telling the pipeline to attempt an assisted-lane
   issue.
+- **Attempt** — one dispatch of the fixer agent on one issue, producing exactly
+  one PR. Ends merged (the issue is solved) or closed-unmerged (the attempt is
+  prior art; the issue returns to the queue). Attempts have history; issues have
+  state.
+- **Lifecycle state** — where an issue is in its life, on GitHub's native state
+  machine: open; closed as completed (a merged fix closed it); closed as
+  not-planned (abandoned). Never encodes who was trusted.
+- **Lane marker** — the `autofixed` label: the auditable record that an issue
+  was solved with no human in the loop, applied by the pipeline at the moment
+  it merges without review. Lane is an axis orthogonal to lifecycle state.
+- **Decline** — the human verdict rejecting an attempt: a reason stated in a
+  comment, then the PR closed unmerged. Terminal for the attempt, not for the
+  issue.
+- **Demo cycle** — one reset-to-reset lifetime of the demo world. Each cycle
+  files fresh issues; a finished cycle's issues are retired.
+- **Retired issue** — an issue from a finished demo cycle, closed as
+  not-planned. Belongs to no lane; kept forever for the audit trail.
 - **Operator note** — optional free-text context a human attaches at dispatch, for
   when the issue alone is missing something the human knows. Appended to the fixer
   agent's fixed prompt as added context; a bare go-word ("do it") attaches nothing
@@ -43,6 +60,7 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
 - **Demo gesture** — the one UI action that makes a bug (or its fix) visible to the
   audience in seconds.
 - **Baseline** — the tagged repo state with bugs planted, logs seeded, suite green.
-  **Reset** rewinds local and GitHub state to it.
+  **Reset** rewinds the code to it and starts a fresh demo cycle: the old cycle's
+  issues are retired, and fresh issues are filed with clean timelines.
 - **Rehearsal ritual** — reset → run → audit transcript; a bug is demo-ready only
   after this passes with the exact demo-day configuration.

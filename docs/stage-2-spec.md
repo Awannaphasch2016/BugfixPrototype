@@ -1,6 +1,7 @@
 # Stage 2 — Chat Control Surface (Two-Lane Demo)
 
-**Status:** `ready-for-agent`
+**Status:** `built` (2026-07-09; commits on main cite this spec)
+**Amended by:** `docs/stage-2b-spec.md` — fresh-issue cycles, lane label, command renames; also records the polling-recovery deviation from this spec's "no polling" line.
 **Tracker:** local (`docs/` is the tracker for build specs; GitHub Issues on this repo is reserved as demo scenery)
 **Stage:** 2 of 3 (revised ladder). Stage 3 = the judgment dispatch: operator note, inline context form, and ticket #4 — one coherent feature, deferred together. Everything else formerly in Stage 3 is roadmap talking points.
 
