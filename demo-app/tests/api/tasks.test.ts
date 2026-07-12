@@ -82,6 +82,20 @@ describe("PATCH /api/tasks/:id", () => {
     const res = await patchTask("does-not-exist", { completed: true });
     expect(res.status).toBe(404);
   });
+
+  // Regression test for issue #13: a task whose title exceeds the schema's
+  // 100-char max (POST does not enforce it) was silently dropped from the
+  // store when a PATCH re-validated the merged task after splicing it out.
+  it("does not lose a task when marking it done fails validation", async () => {
+    const longTitle = "x".repeat(138);
+    const { task } = await (await createTask({ title: longTitle })).json();
+
+    const res = await patchTask(task.id, { completed: true });
+
+    const list = await (await listTasks()).json();
+    expect(list.tasks.map((t: { id: string }) => t.id)).toContain(task.id);
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("GET /api/tasks", () => {
@@ -93,5 +107,17 @@ describe("GET /api/tasks", () => {
     const list = await (await listTasks("?status=active")).json();
     expect(list.tasks).toHaveLength(1);
     expect(list.tasks[0].title).toBe("Ship v2");
+  });
+
+  // Regression test for issue #13: ?status=done filtered on !t.completed,
+  // so tasks marked done never showed up in the Done tab.
+  it("lists only done tasks with ?status=done", async () => {
+    const { task: done } = await (await createTask({ title: "Ship v1" })).json();
+    await (await createTask({ title: "Ship v2" })).json();
+    await patchTask(done.id, { completed: true });
+
+    const list = await (await listTasks("?status=done")).json();
+    expect(list.tasks).toHaveLength(1);
+    expect(list.tasks[0].title).toBe("Ship v1");
   });
 });
