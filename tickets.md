@@ -116,12 +116,18 @@ note, end to end; Request #4 filed by reset.
       the runner now restores runtime files before staging.)
 - [x] Bug 1's setup pre-run re-verified under the amended prompt; rehearsal
       record updated. (2026-07-12: PR #21, one-shot, exception untouched.)
-- [ ] Request run: one-shot from the chat with the pasted note; exception
+- [x] Request run: one-shot from the chat with the pasted note; exception
       justified in the PR body; fix is color-only; wall clock recorded.
-      (Rehearsal 1, 2026-07-12: FAILED the color-only check — the diff also
-      added zebra striping, invited by the v1 complaint text; every other
-      check green, 144s wall clock. PR #25 discarded, request text iterated
-      to v2 per the spec's remedy; re-run pending on the next cycle.)
-- [ ] Runbook and choreography updated (dispatch click, bottom card, paste
+      (Took three rehearsals, all 2026-07-12: r1 FAILED color-only — the v1
+      text's lose-my-place line invited zebra striping; text iterated to v2.
+      r2 passed every check but was discarded as contaminated — the fixer
+      found rehearsal 1's compiled classes in the demo-app `.next` cache;
+      reset.sh now clears that cache. r3 = certification PASS on a clean
+      cache: PR #35, single color-only hunk, 419s. Observed range 144–419s —
+      the spec's "much shorter than the bugs" expectation is corrected in
+      the runbook.)
+- [x] Runbook and choreography updated (dispatch click, bottom card, paste
       beat, narration, deferral line); rehearsal records current.
-- [ ] Demo-ready verdict recorded in the answer key.
+- [x] Demo-ready verdict recorded in the answer key. (PASS, 2026-07-12;
+      world parked at opening inventory — #36 autofixed via PR #40,
+      #37/#38/#39 open, zero open PRs.)
