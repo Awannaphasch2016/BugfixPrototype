@@ -53,9 +53,31 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
   agent's fixed prompt as reporting context and posted to the issue as a comment,
   so the judgment enters the record; an empty field attaches nothing and the fixed
   prompt runs untouched. Never a replacement for the fixed prompt.
-- **Routing policy** — the rule deciding which lane an issue lands in. Policy, not
-  AI: validated bug classes autofix, everything else queues. Widening the policy as
-  trust builds is the engagement's growth story.
+- **Routing policy** — the rule deciding where a signal's work lands: problem
+  classes with precedent go to the autofix lane; novel classes escalate to a human.
+  Widening trust through accumulated precedent is the engagement's growth story.
+  (Superseded the hand-maintained bug-class allowlist, 2026-07-12.)
+- **Signal** — a detected anomaly in the monitored logs — an error signature
+  firing — upstream of any issue. The signaling layer's unit of work.
+- **Signaling layer** — the monitoring path that turns raw logs into routed work:
+  detects signals, filters noise (repeats collapse into one), and routes each
+  signal — autofix, enriched issue, or page-a-human.
+- **Problem class** — the kind of defect a signal represents; the unit at which
+  the pipeline accumulates trust.
+- **Precedent** — a human-approved merged fix of a problem class: the evidence
+  that lets later signals of that class route to the autofix lane. The demo's
+  opening state seeds initial precedents; who first classified them (human or
+  agent) is deliberately unspecified.
+- **Context report** — the enriched summary attached to an auto-filed issue
+  before agent handoff: relevant log excerpt selected, paths canonicalized,
+  personal data visibly redacted.
+- **Role agent** — a named specialist agent (planner, implementer, tester,
+  reviewer, debugger) the runner invokes per stage of an attempt; each leaves an
+  attributed artifact (comment, commit, review, screenshot) on the issue or PR.
+- **Walkthrough** — the audience-facing demonstration: one defect's full
+  lifecycle end-to-end, with every platform capability visible as a step or an
+  artifact along the way. The demo is a deliberately narrow but honest sample of
+  the full platform.
 - **Chat** — the single surface built in Stage 2: a messaging-app-style page where the
   operator commands the pipeline and sees its state. Stands in for Slack/Telegram/LINE
   in the fiction; commands in, bot replies (cards) out.
