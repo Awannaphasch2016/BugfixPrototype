@@ -108,12 +108,20 @@ note, end to end; Request #4 filed by reset.
 
 - [x] Tag moved forward over all Stage 3 commits before the first reset
       (2026-07-12, together with ticket 1's move — see above).
-- [ ] Bugs 2 and 3: transcripts audited — red-then-green route-seam tests,
+- [x] Bugs 2 and 3: transcripts audited — red-then-green route-seam tests,
       no use of the styling exception, no reads outside demo-app.
-- [ ] Bug 1's setup pre-run re-verified under the amended prompt; rehearsal
-      record updated.
+      (2026-07-12: PRs #23 and #24, both one-shot via chat dispatch and
+      merged from the chat. Bug 2's first attempt, PR #22, matched the
+      answer key but carried log-file run exhaust in its diff — discarded;
+      the runner now restores runtime files before staging.)
+- [x] Bug 1's setup pre-run re-verified under the amended prompt; rehearsal
+      record updated. (2026-07-12: PR #21, one-shot, exception untouched.)
 - [ ] Request run: one-shot from the chat with the pasted note; exception
       justified in the PR body; fix is color-only; wall clock recorded.
+      (Rehearsal 1, 2026-07-12: FAILED the color-only check — the diff also
+      added zebra striping, invited by the v1 complaint text; every other
+      check green, 144s wall clock. PR #25 discarded, request text iterated
+      to v2 per the spec's remedy; re-run pending on the next cycle.)
 - [ ] Runbook and choreography updated (dispatch click, bottom card, paste
       beat, narration, deferral line); rehearsal records current.
 - [ ] Demo-ready verdict recorded in the answer key.
