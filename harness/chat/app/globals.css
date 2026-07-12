@@ -32,6 +32,26 @@
   text-decoration: underline;
 }
 
+.badge {
+  display: inline-block;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.75em;
+  font-weight: 600;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.badge-autofixed {
+  background: #dafbe1;
+  color: #1a7f37;
+}
+
+.badge-human-approved {
+  background: #ddf4ff;
+  color: #0969da;
+}
+
 .card-status {
   font-size: 0.85em;
   color: #57606a;

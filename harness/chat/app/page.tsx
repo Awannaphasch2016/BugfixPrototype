@@ -14,6 +14,9 @@ import {
 type Issue = { number: number; title: string; url: string };
 type PrRef = { number: number; title?: string; url: string };
 type AutofixedEntry = { issue: Issue; pr: PrRef };
+// The two lanes, as recorded on GitHub: the `autofixed` label present or not.
+type Badge = "autofixed" | "human-approved";
+type SolvedEntry = { issue: Issue; pr: PrRef; badge: Badge };
 
 // One state per card, one direction: a failed merge parks the card (recovery
 // is the runbook, not a retry button).
@@ -23,7 +26,8 @@ type ChatMessage =
   | { id: number; kind: "user"; text: string }
   | { id: number; kind: "bot"; text: string; chips?: boolean }
   | { id: number; kind: "autofixed"; entries: AutofixedEntry[] }
-  | { id: number; kind: "unsolved"; issues: Issue[] }
+  | { id: number; kind: "solved"; entries: SolvedEntry[] }
+  | { id: number; kind: "issues"; issues: Issue[] }
   | {
       id: number;
       kind: "pr";
@@ -35,13 +39,17 @@ type ChatMessage =
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-const LIST_AUTOFIXED = "/list-recently-autofixed";
-const LIST_UNSOLVED = "/list-unsolved-issues";
+// Exactly one vocabulary: the three commands partition the story, and the
+// old Stage 2 names fall through to the graceful fallback — no silent aliases.
+const CMD_ISSUES = "/issues";
+const CMD_SOLVED = "/solved";
+const CMD_AUTOFIXED = "/autofixed";
 
 const WELCOME =
-  "Hi! I run the bug-fix pipeline. I fix routine bugs on my own; " +
-  "anything I'm not yet trusted with waits for you to dispatch it. " +
-  "Pick a command:";
+  "Hi! I run the bug-fix pipeline. Three commands: " +
+  `${CMD_ISSUES} — the open queue, waiting to be dispatched; ` +
+  `${CMD_SOLVED} — every fixed bug, badged by who was in the loop; ` +
+  `${CMD_AUTOFIXED} — the fixes that shipped with no human in the loop.`;
 
 export default function Home() {
   const nextId = useRef(1);
@@ -124,7 +132,7 @@ export default function Home() {
     try {
       const { autofixed } = await fetchJson("/api/autofixed");
       if (autofixed.length === 0) {
-        addBot("The autofix lane is empty — no merged fixes with a closed issue yet.", true);
+        addBot("The autofix lane is empty — nothing merged without a human yet.", true);
       } else {
         add({ kind: "autofixed", entries: autofixed });
       }
@@ -133,16 +141,29 @@ export default function Home() {
     }
   }
 
-  async function listUnsolved() {
+  async function listSolved() {
     try {
-      const { issues } = await fetchJson("/api/unsolved-issues");
-      if (issues.length === 0) {
-        addBot("No unsolved issues — the queue is clear.", true);
+      const { solved } = await fetchJson("/api/solved");
+      if (solved.length === 0) {
+        addBot("Nothing solved yet this cycle.", true);
       } else {
-        add({ kind: "unsolved", issues });
+        add({ kind: "solved", entries: solved });
       }
     } catch (error) {
-      addBot(`Something went wrong listing unsolved issues: ${(error as Error).message}`);
+      addBot(`Something went wrong listing solved issues: ${(error as Error).message}`);
+    }
+  }
+
+  async function listIssues() {
+    try {
+      const { issues } = await fetchJson("/api/issues");
+      if (issues.length === 0) {
+        addBot("No open issues — the queue is clear.", true);
+      } else {
+        add({ kind: "issues", issues });
+      }
+    } catch (error) {
+      addBot(`Something went wrong listing open issues: ${(error as Error).message}`);
     }
   }
 
@@ -150,12 +171,14 @@ export default function Home() {
     const text = raw.trim();
     if (!text) return;
     add({ kind: "user", text });
-    if (text === LIST_AUTOFIXED) {
+    if (text === CMD_ISSUES) {
+      void listIssues();
+    } else if (text === CMD_SOLVED) {
+      void listSolved();
+    } else if (text === CMD_AUTOFIXED) {
       void listAutofixed();
-    } else if (text === LIST_UNSOLVED) {
-      void listUnsolved();
     } else {
-      addBot("I only speak two commands — pick one:", true);
+      addBot("I only speak three commands — pick one:", true);
     }
   }
 
@@ -205,12 +228,11 @@ export default function Home() {
   function CommandChips() {
     return (
       <div className="chip-row">
-        <button className="chip" onClick={() => handleCommand(LIST_AUTOFIXED)}>
-          {LIST_AUTOFIXED}
-        </button>
-        <button className="chip" onClick={() => handleCommand(LIST_UNSOLVED)}>
-          {LIST_UNSOLVED}
-        </button>
+        {[CMD_ISSUES, CMD_SOLVED, CMD_AUTOFIXED].map((cmd) => (
+          <button className="chip" key={cmd} onClick={() => handleCommand(cmd)}>
+            {cmd}
+          </button>
+        ))}
       </div>
     );
   }
@@ -246,7 +268,30 @@ export default function Home() {
             ))}
           </>
         );
-      case "unsolved":
+      case "solved":
+        return (
+          <>
+            Everything solved so far — the badge says who was in the loop, the
+            links are the receipts:
+            {msg.entries.map(({ issue, pr, badge }) => (
+              <div className="card" key={pr.number}>
+                <div className="card-title">
+                  #{issue.number} {issue.title}
+                  <span className={`badge badge-${badge}`}>{badge}</span>
+                </div>
+                <div className="card-links">
+                  <a href={issue.url} target="_blank" rel="noreferrer">
+                    issue #{issue.number} (closed)
+                  </a>
+                  <a href={pr.url} target="_blank" rel="noreferrer">
+                    PR #{pr.number} (merged)
+                  </a>
+                </div>
+              </div>
+            ))}
+          </>
+        );
+      case "issues":
         return (
           <>
             In the queue — dispatch one and I&apos;ll take a shot at it:
@@ -336,7 +381,7 @@ export default function Home() {
             ))}
           </MessageList>
           <MessageInput
-            placeholder={`Type ${LIST_AUTOFIXED} or ${LIST_UNSOLVED}`}
+            placeholder={`Type ${CMD_ISSUES}, ${CMD_SOLVED}, or ${CMD_AUTOFIXED}`}
             attachButton={false}
             onSend={(_html, textContent) => handleCommand(textContent)}
           />

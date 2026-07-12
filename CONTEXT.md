@@ -33,6 +33,9 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
 - **Lane marker** — the `autofixed` label: the auditable record that an issue
   was solved with no human in the loop, applied by the pipeline at the moment
   it merges without review. Lane is an axis orthogonal to lifecycle state.
+- **Badge** — a solved card's lane, as shown in the chat: **autofixed** (lane
+  marker present) or **human-approved** (absent — the fix merged through the
+  assisted lane, a human clicking Merge).
 - **Decline** — the human verdict rejecting an attempt: a reason stated in a
   comment, then the PR closed unmerged. Terminal for the attempt, not for the
   issue.
