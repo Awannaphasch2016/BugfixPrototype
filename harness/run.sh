@@ -100,6 +100,11 @@ else
   echo "WARNING: session transcript not found at $TRANSCRIPT — rehearsal audit will lack it" >&2
 fi
 
+# The agent's test runs append to the runtime files (tests isolate TASKS_FILE
+# but the logger writes to the real logs/app.log). That's run exhaust, never
+# part of a fix — restore both so it can't ride into the PR.
+git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
+
 git add -A
 CHANGED=$(git diff --cached --name-only)
 [[ -n "$CHANGED" ]] || abort "agent made no changes"
