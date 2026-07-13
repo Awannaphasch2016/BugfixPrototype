@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   if (status === "active") {
     tasks = tasks.filter((t) => !t.completed);
   } else if (status === "done") {
-    tasks = tasks.filter((t) => !t.completed);
+    tasks = tasks.filter((t) => t.completed);
   }
   tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   log.info({ status: status ?? "all", count: tasks.length }, "listed tasks");
