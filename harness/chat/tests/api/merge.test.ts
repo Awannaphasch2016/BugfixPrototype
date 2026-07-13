@@ -13,7 +13,8 @@ describe("POST /api/merge", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(await spawnedCommands()).toEqual([
-      "git checkout HEAD -- demo-app/data/tasks.json demo-app/logs/app.log",
+      "git show HEAD:demo-app/data/tasks.json",
+      "git show HEAD:demo-app/logs/app.log",
       "gh pr merge 7 --merge --delete-branch",
       "git checkout main",
       "git pull --ff-only origin main",

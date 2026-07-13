@@ -31,7 +31,8 @@ describe("POST /api/dispatch", () => {
   it("restores exactly the two runtime-dirtied data files before the runner starts", async () => {
     await dispatchIssue(2);
     expect(await spawnedCommands()).toEqual([
-      "git checkout HEAD -- demo-app/data/tasks.json demo-app/logs/app.log",
+      "git show HEAD:demo-app/data/tasks.json",
+      "git show HEAD:demo-app/logs/app.log",
       "runner 2",
     ]);
   });
@@ -61,7 +62,8 @@ describe("POST /api/dispatch", () => {
     const res = await dispatchIssue(2, "use green for the text in the todo list");
     expect(res.status).toBe(200);
     expect(await spawnedCommands()).toEqual([
-      "git checkout HEAD -- demo-app/data/tasks.json demo-app/logs/app.log",
+      "git show HEAD:demo-app/data/tasks.json",
+      "git show HEAD:demo-app/logs/app.log",
       "gh issue comment 2 --body use green for the text in the todo list",
       "runner 2 use green for the text in the todo list",
     ]);
@@ -71,7 +73,8 @@ describe("POST /api/dispatch", () => {
     const res = await dispatchIssue(2, "  \n\t ");
     expect(res.status).toBe(200);
     expect(await spawnedCommands()).toEqual([
-      "git checkout HEAD -- demo-app/data/tasks.json demo-app/logs/app.log",
+      "git show HEAD:demo-app/data/tasks.json",
+      "git show HEAD:demo-app/logs/app.log",
       "runner 2",
     ]);
   });
