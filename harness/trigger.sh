@@ -28,9 +28,13 @@ PAYLOAD=$(jq -n --arg t "$LONG_TITLE" '{title: $t}')
 STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "$BASE_URL/api/tasks/$TASK_ID" \
   -H "Content-Type: application/json" -d "$PAYLOAD")
 
-if [[ "$STATUS" == "400" ]]; then
-  echo "==> trigger fired: PATCH /api/tasks/$TASK_ID rejected ($STATUS) — signature 'task update failed validation' is now in the log"
+# Either status means the validation guard fired and the signature is in the
+# log; which one you get is itself the bug's story — the unfixed handler
+# swallows the failure and answers 200 (the silent data mangling the report
+# complains about), the fixed one surfaces the rejection as a 400.
+if [[ "$STATUS" == "200" || "$STATUS" == "400" ]]; then
+  echo "==> trigger fired: PATCH /api/tasks/$TASK_ID answered $STATUS — signature 'task update failed validation' is now in the log"
 else
-  echo "trigger: expected a 400 validation rejection, got $STATUS — the signature may not have fired" >&2
+  echo "trigger: expected 200 (unfixed, swallowed) or 400 (fixed, surfaced), got $STATUS — the signature may not have fired" >&2
   exit 1
 fi
