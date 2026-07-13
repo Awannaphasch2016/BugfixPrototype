@@ -5,13 +5,21 @@ directory; this directory owns everything deterministic.
 
 ## Scripts
 
-- `run.sh [--replay] <issue-number> [note]` — the one visible demo action:
-  fetches the issue, branches, runs the fixer agent (Claude Code,
-  non-interactive, scoped to `demo-app/`), then commits, pushes, and opens the
-  PR itself. The optional note (the operator's judgment, already on the issue
-  as a comment by the time the runner starts) is spliced into the fixed prompt
-  as a "note from the team" section between the bug report and the contract —
-  added context, never a replacement. Fails cleanly (nothing pushed) if the
+- `run.sh [--replay] <issue-number> [note]` — the one visible demo action,
+  now a staged role pipeline: the **planner** (read-only) diagnoses and posts
+  its plan to the issue as an attributed comment before any commit exists;
+  the **fixer** implements (Claude Code, non-interactive, scoped to
+  `demo-app/`) with the plan spliced additively into its prompt; the runner
+  commits, pushes, and opens the PR itself; the **reviewer** then posts one
+  post-hoc findings comment on the PR — no revision loop. The optional note
+  (the operator's judgment, already on the issue as a comment by the time the
+  runner starts) is spliced into the fixed prompt as a "note from the team"
+  section between the bug report and the contract — added context, never a
+  replacement; the plan section follows it, and the contract stays last.
+  Per-stage wall clocks land in `harness/private/stages-issue-<n>.json`.
+  Prompt composition is verified byte-for-byte by
+  `harness/tests/prompt-shape.sh` (stubbed `claude`/`gh` in a throwaway
+  clone — no network, no agent). Fails cleanly (nothing pushed) if the
   agent errors, changes nothing, or touches files outside the app. Agent
   output and session transcript land in `harness/private/` for the rehearsal
   audit. `--replay` swaps the fixer for the agent-output cache entry matching

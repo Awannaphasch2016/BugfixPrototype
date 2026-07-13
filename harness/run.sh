@@ -67,6 +67,81 @@ $NOTE
 "
 fi
 
+mkdir -p harness/private
+RESULT_JSON="harness/private/run-issue-$ISSUE.json"
+PLANNER_SECS=0
+FIXER_SECS=0
+REVIEWER_SECS=0
+
+# Copy a stage's session transcript into the answer key for the rehearsal
+# audit: save_transcript <result-json> <destination-suffix>
+save_transcript() {
+  local session_id transcript
+  session_id=$(jq -r '.session_id' "$1")
+  transcript="$HOME/.claude/projects/$(echo "$REPO_ROOT/$APP_DIR" | tr '/.' '--')/$session_id.jsonl"
+  if [[ -f "$transcript" ]]; then
+    cp "$transcript" "harness/private/transcript-issue-$ISSUE$2.jsonl"
+  else
+    echo "WARNING: session transcript not found at $transcript — rehearsal audit will lack it" >&2
+  fi
+}
+
+# ---- planner stage --------------------------------------------------------
+# Role adapted from the vendored code-architect (blueprint shape) and debugger
+# (root-cause contract) templates — .claude/agents/vendor/. Read-only by
+# contract; the sandbox settings in demo-app/.claude/ apply as ever.
+PLAN_SECTION=""
+if (( ! REPLAY )); then
+  PLANNER_PROMPT=$(cat <<EOF
+You are the planner in a pipeline that fixes reported bugs in this task-management app: a read-only diagnostician whose blueprint a separate implementer executes. This directory is the entire application.
+
+## Bug report (issue #$ISSUE): $TITLE
+
+$BODY
+
+${NOTE_SECTION}## Your job
+
+1. Investigate and find the root cause. Consult the project documentation in docs/ (the runbook's investigation method, the coding standards) and follow where it applies. Read the code; if the report mentions application logs, interrogate them (grep, jq) and correlate what you find with the code paths involved.
+2. Be decisive: one diagnosis, with the evidence (files, line references, exact log lines if logs were involved).
+3. Plan the smallest correct fix: which file(s) to change and how, and the regression test at the API route-handler seam that will fail against the current code for the reported reason and pass with the fix. Exception: if the fix is purely presentational (styling only — no API route's behavior changes), plan no test and say why no route-level test can capture the change.
+4. Make NO changes: do not edit files, do not create files, do not run git. Reading, grepping, and running the existing test suite are fine.
+
+When you are done, your final reply must be pure markdown, with no preamble or closing remarks around it:
+- "## Diagnosis" — the root cause and how the evidence points to it
+- "## Plan" — the fix and the regression test, concretely
+- "## Sources consulted" — the documentation section(s) that genuinely guided the investigation, each as the file path plus heading and one line on what it contributed; if none did, say so plainly
+EOF
+)
+
+  PLAN_JSON="harness/private/plan-issue-$ISSUE.json"
+  echo "==> [planner] diagnosing issue #$ISSUE: $TITLE"
+  STAGE_T0=$SECONDS
+  (cd "$APP_DIR" && claude -p "$PLANNER_PROMPT" --output-format json) > "$PLAN_JSON" ||
+    abort "planner exited non-zero (see $PLAN_JSON)"
+  PLANNER_SECS=$((SECONDS - STAGE_T0))
+  [[ "$(jq -r '.is_error' "$PLAN_JSON")" == "false" ]] ||
+    abort "planner reported an error (see $PLAN_JSON)"
+  PLAN=$(jq -r '.result' "$PLAN_JSON")
+  [[ -n "$PLAN" && "$PLAN" != "null" ]] || abort "planner returned no plan"
+  save_transcript "$PLAN_JSON" "-planner"
+
+  # The same text lands on the record and in the fixer's prompt: posted to the
+  # issue as the attributed plan comment (before any commit exists), spliced
+  # additively into the fixer prompt below.
+  gh issue comment "$ISSUE" \
+    --body "$(printf '## Plan — planner agent\n\n%s' "$PLAN")" >/dev/null ||
+    abort "could not post the plan comment to issue #$ISSUE"
+  echo "==> [planner] plan posted to issue #$ISSUE (${PLANNER_SECS}s)"
+
+  PLAN_SECTION="## Plan from the planner agent
+
+$PLAN
+
+Verify this diagnosis against the code as you work; the contract below still governs.
+
+"
+fi
+
 PROMPT=$(cat <<EOF
 You are a senior engineer fixing a reported bug in this task-management app. This directory is the entire application.
 
@@ -74,7 +149,7 @@ You are a senior engineer fixing a reported bug in this task-management app. Thi
 
 $BODY
 
-${NOTE_SECTION}## Your job
+${NOTE_SECTION}${PLAN_SECTION}## Your job
 
 1. Investigate and find the root cause. Read the code; if the report mentions application logs, interrogate them (grep, jq) and correlate what you find with the code paths involved.
 2. Write a regression test at the API route-handler seam (Vitest, alongside the existing tests in tests/) that reproduces the reported behavior. Run it and confirm it FAILS against the current code for the reported reason. Exception: if the fix is purely presentational (styling only — no API route's behavior changes), write no new test; instead your "## Regression test" section must explain in one or two sentences why no route-level test can capture the change.
@@ -91,11 +166,9 @@ Your final reply is used verbatim as the PR body — it must contain ONLY the PR
 EOF
 )
 
-mkdir -p harness/private
-RESULT_JSON="harness/private/run-issue-$ISSUE.json"
-
+# ---- fixer stage ----------------------------------------------------------
 if (( REPLAY )); then
-  # Replay: canned agent, real everything-else. The cache is keyed by
+  # Replay: canned agents, real everything-else. The cache is keyed by
   # answer-key bug title, so the fresh cycle's issue number doesn't matter.
   SLUG=$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' |
     sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
@@ -106,6 +179,13 @@ if (( REPLAY )); then
     echo "WARNING: replay composes no prompt — the note is ignored here (it was already posted to the issue by the dispatcher)" >&2
 
   echo "==> REPLAY on issue #$ISSUE: $TITLE — cached fix, no agent (never present as live)"
+  if [[ -f "$CACHE_DIR/plan.md" ]]; then
+    gh issue comment "$ISSUE" --body "$(cat "$CACHE_DIR/plan.md")" >/dev/null ||
+      abort "could not post the cached plan comment to issue #$ISSUE"
+    echo "==> REPLAY: cached plan comment posted to issue #$ISSUE"
+  else
+    echo "WARNING: cache entry has no plan.md — planner artifact skipped in replay" >&2
+  fi
   git apply --3way "$CACHE_DIR/fix.patch" || abort "cached patch failed to apply"
   cp "$CACHE_DIR/result.json" "$RESULT_JSON"
   PR_BODY=$(jq -r '.result' "$RESULT_JSON")
@@ -117,9 +197,11 @@ if (( REPLAY )); then
     echo "WARNING: cache entry has no transcript — downstream trace artifacts will lack it" >&2
   fi
 else
-  echo "==> Running fixer agent on issue #$ISSUE: $TITLE"
+  echo "==> [fixer] implementing fix for issue #$ISSUE: $TITLE"
+  STAGE_T0=$SECONDS
   (cd "$APP_DIR" && claude -p "$PROMPT" --output-format json) > "$RESULT_JSON" ||
     abort "agent exited non-zero (see $RESULT_JSON)"
+  FIXER_SECS=$((SECONDS - STAGE_T0))
 
   [[ "$(jq -r '.is_error' "$RESULT_JSON")" == "false" ]] ||
     abort "agent reported an error (see $RESULT_JSON)"
@@ -127,13 +209,8 @@ else
   [[ -n "$PR_BODY" && "$PR_BODY" != "null" ]] || abort "agent returned no summary"
 
   # keep the session transcript for the rehearsal audit
-  SESSION_ID=$(jq -r '.session_id' "$RESULT_JSON")
-  TRANSCRIPT="$HOME/.claude/projects/$(echo "$REPO_ROOT/$APP_DIR" | tr '/.' '--')/$SESSION_ID.jsonl"
-  if [[ -f "$TRANSCRIPT" ]]; then
-    cp "$TRANSCRIPT" "harness/private/transcript-issue-$ISSUE.jsonl"
-  else
-    echo "WARNING: session transcript not found at $TRANSCRIPT — rehearsal audit will lack it" >&2
-  fi
+  save_transcript "$RESULT_JSON" ""
+  echo "==> [fixer] done (${FIXER_SECS}s)"
 fi
 
 # The agent's test runs append to the runtime files (tests isolate TASKS_FILE
@@ -162,6 +239,74 @@ Closes #$ISSUE"); then
   git push -q origin --delete "$BRANCH" || true
   abort "gh pr create failed — remote branch removed, nothing published"
 fi
+PR_NUMBER="${PR_URL##*/}"
+
+# ---- reviewer stage --------------------------------------------------------
+# One post-hoc pass, findings posted as a PR comment to inform the human merge
+# decision; no revision loop (roadmap, trust-gated). Role adapted from the
+# vendored code-reviewer template. The PR is already published, so a reviewer
+# failure warns instead of aborting — the dispatch still ends with a real PR.
+REVIEW_COMMENT=""
+if (( REPLAY )); then
+  if [[ -f "$CACHE_DIR/review.md" ]]; then
+    REVIEW_COMMENT=$(cat "$CACHE_DIR/review.md")
+  else
+    echo "WARNING: cache entry has no review.md — reviewer artifact skipped in replay" >&2
+  fi
+else
+  DIFF=$(git diff "main...$BRANCH" -- "$APP_DIR")
+  REVIEWER_PROMPT=$(cat <<EOF
+You are the reviewer in a pipeline that fixes reported bugs in this task-management app: one post-hoc pass over a just-opened PR, informing the human who decides whether to merge. You report; you never change code, and there is no revision loop. This directory is the entire application, already containing the change under review.
+
+## The PR under review — fixes issue #$ISSUE: $TITLE
+
+$PR_BODY
+
+## The diff
+
+\`\`\`diff
+$DIFF
+\`\`\`
+
+## Your job
+
+1. Judge the change against the project documentation in docs/ (coding standards, the runbook's testing conventions) and for actual defects: logic errors, missed edge cases at the API boundary, a regression test that would still pass if the bug were reintroduced differently, scope creep beyond the smallest fix.
+2. Read whatever code you need for context; run the test suite if it sharpens a finding. Do not edit files; do not run git.
+3. Rate each candidate issue 0-100 confidence and report ONLY issues at 80 or above, grouped Critical (90-100) and Important (80-89), each with file, line, why it matters, and a concrete fix. If nothing clears the bar, confirm the change meets the standards in two or three sentences naming what you checked.
+
+Your final reply is posted verbatim as a PR comment: pure markdown, starting with a "### Verdict" line (one sentence), then your findings or confirmation, with no preamble or closing remarks around it.
+EOF
+)
+
+  REVIEW_JSON="harness/private/review-issue-$ISSUE.json"
+  echo "==> [reviewer] reviewing PR #$PR_NUMBER"
+  STAGE_T0=$SECONDS
+  if (cd "$APP_DIR" && claude -p "$REVIEWER_PROMPT" --output-format json) > "$REVIEW_JSON" &&
+    [[ "$(jq -r '.is_error' "$REVIEW_JSON")" == "false" ]]; then
+    REVIEWER_SECS=$((SECONDS - STAGE_T0))
+    REVIEW_BODY=$(jq -r '.result' "$REVIEW_JSON")
+    if [[ -n "$REVIEW_BODY" && "$REVIEW_BODY" != "null" ]]; then
+      REVIEW_COMMENT=$(printf '## Review — reviewer agent\n\n%s' "$REVIEW_BODY")
+    fi
+    save_transcript "$REVIEW_JSON" "-reviewer"
+  fi
+  [[ -n "$REVIEW_COMMENT" ]] ||
+    echo "WARNING: reviewer stage failed (see $REVIEW_JSON) — PR #$PR_NUMBER stands unreviewed" >&2
+fi
+if [[ -n "$REVIEW_COMMENT" ]]; then
+  if gh pr comment "$PR_NUMBER" --body "$REVIEW_COMMENT" >/dev/null; then
+    echo "==> [reviewer] findings posted to PR #$PR_NUMBER (${REVIEWER_SECS}s)"
+  else
+    echo "WARNING: could not post the review comment — PR #$PR_NUMBER stands unreviewed" >&2
+  fi
+fi
+
+# Stage wall clocks feed the narration schedule (what the operator shows
+# during each wait).
+jq -n --argjson planner "$PLANNER_SECS" --argjson fixer "$FIXER_SECS" \
+  --argjson reviewer "$REVIEWER_SECS" --argjson replay "$REPLAY" \
+  '{planner: $planner, fixer: $fixer, reviewer: $reviewer, replay: ($replay == 1)}' \
+  > "harness/private/stages-issue-$ISSUE.json"
 
 git checkout -q main
 echo "==> PR ready for review: $PR_URL"

@@ -83,6 +83,30 @@ else
   echo "WARNING: no transcript-issue-$ISSUE.jsonl — replay will lack a transcript" >&2
 fi
 
+# Role artifacts: the attributed plan and review comments, verbatim, so replay
+# can re-post them for real; plus the per-stage transcripts when present.
+PLAN_BODY=$(gh issue view "$ISSUE" --json comments \
+  --jq '[.comments[] | select(.body | startswith("## Plan — planner agent"))] | last | .body // empty')
+if [[ -n "$PLAN_BODY" ]]; then
+  printf '%s' "$PLAN_BODY" > "$CACHE_DIR/plan.md"
+else
+  rm -f "$CACHE_DIR/plan.md"
+  echo "WARNING: no plan comment on issue #$ISSUE — replay will skip the planner artifact" >&2
+fi
+REVIEW_BODY=$(gh pr view "$PR" --json comments \
+  --jq '[.comments[] | select(.body | startswith("## Review — reviewer agent"))] | last | .body // empty')
+if [[ -n "$REVIEW_BODY" ]]; then
+  printf '%s' "$REVIEW_BODY" > "$CACHE_DIR/review.md"
+else
+  rm -f "$CACHE_DIR/review.md"
+  echo "WARNING: no review comment on PR #$PR — replay will skip the reviewer artifact" >&2
+fi
+for STAGE in planner reviewer; do
+  if [[ -f "harness/private/transcript-issue-$ISSUE-$STAGE.jsonl" ]]; then
+    cp "harness/private/transcript-issue-$ISSUE-$STAGE.jsonl" "$CACHE_DIR/transcript-$STAGE.jsonl"
+  fi
+done
+
 jq -n --arg title "$TITLE" --arg slug "$SLUG" \
   --argjson issue "$ISSUE" --argjson pr "$PR" \
   --arg headSha "$HEAD_SHA" --arg baseline "$(git rev-parse "$TAG")" \

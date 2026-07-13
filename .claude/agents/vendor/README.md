@@ -4,8 +4,9 @@ Agent-template markdown files vendored verbatim from upstream, per
 `docs/stage-4-spec.md` ("Implementation Decisions" → adopted tools) and
 `docs/research/tool-stack-research.md` ("Prompt sources, ranked by
 provenance"). These are the source texts for the runner's per-stage role
-prompts (see `harness/prompts/`). Files are unmodified upstream copies;
-adaptations belong in our own files, not here.
+prompts (inline heredocs in `harness/run.sh`; recipe in the `role-agents`
+skill). Files are unmodified upstream copies; adaptations belong in our own
+files, not here.
 
 Fetched: 2026-07-13, pinned to the commit SHAs below via
 `raw.githubusercontent.com`.
