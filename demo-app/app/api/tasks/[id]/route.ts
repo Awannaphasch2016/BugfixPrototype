@@ -28,10 +28,14 @@ export async function PATCH(
   };
   try {
     taskSchema.parse(updated);
-    tasks.push(updated);
   } catch (err) {
     log.error({ err, taskId: id }, "task update failed validation");
+    return Response.json(
+      { error: "task update failed validation" },
+      { status: 400 }
+    );
   }
+  tasks.push(updated);
   await writeTasks(tasks);
   log.info({ taskId: id }, "task updated");
   return Response.json({ task: updated });
