@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 
@@ -18,6 +18,10 @@ export async function freshStubEnv() {
   process.env.CHAT_GIT_CMD = await writeStub("git");
   process.env.CHAT_GH_CMD = await writeStub("gh");
   process.env.CHAT_RUNNER_CMD = await writeStub("runner");
+  // The runtime-dirtied files' homes: the in-place restore writes real files
+  // under the repo root (the stubbed git supplies their committed content).
+  await mkdir(path.join(dir, "demo-app", "data"), { recursive: true });
+  await mkdir(path.join(dir, "demo-app", "logs"), { recursive: true });
 }
 
 export async function writeStub(name: string, body = "") {
