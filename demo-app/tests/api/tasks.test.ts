@@ -78,6 +78,16 @@ describe("PATCH /api/tasks/:id", () => {
     expect(list.tasks[0].completed).toBe(false);
   });
 
+  it("rejects an over-long title with 400 and keeps the task", async () => {
+    const { task } = await (await createTask({ title: "Plan offsite" })).json();
+    const res = await patchTask(task.id, { title: "x".repeat(101) });
+    expect(res.status).toBe(400);
+
+    const list = await (await listTasks()).json();
+    expect(list.tasks).toHaveLength(1);
+    expect(list.tasks[0].title).toBe("Plan offsite");
+  });
+
   it("404s for an unknown task id", async () => {
     const res = await patchTask("does-not-exist", { completed: true });
     expect(res.status).toBe(404);
