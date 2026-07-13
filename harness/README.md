@@ -47,9 +47,12 @@ directory; this directory owns everything deterministic.
   to the `demo-baseline` tag, closes open PRs, deletes `fix/*` branches,
   retires the previous cycle's issues (closed as "not planned"; completed ones
   are reopened first so the close reason can be rewritten, and issues already
-  retired are never touched again), then files four fresh issues with clean
-  timelines — bug 1 → bug 2 → bug 3 → request #4, in demo order so their
-  numbers ascend and the request sits last in the queue. Issue texts are read
+  retired are never touched again), then files three fresh issues with clean
+  timelines — bug 1 → bug 2 → request, in demo order so their numbers ascend
+  and the request sits last in the queue. The reserved bug is deliberately
+  not pre-filed: its issue is born live through the signaling layer (trigger
+  step → detection → routing → enriched filing), or through
+  `route-signal.sh`/`file-signal-issue.sh` as fallbacks. Issue texts are read
   at filing time from the answer key (`harness/private/issues/bug-<n>.md` and
   `request-4.md`, title on the first line, body after), so the verbatim
   reports never enter a commit. Nothing is ever deleted — retired issues and merged PRs stay

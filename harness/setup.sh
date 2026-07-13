@@ -56,4 +56,4 @@ git checkout -q main
 git pull -q --ff-only origin main
 
 echo "==> setup complete: issue #$ISSUE ('$TITLE') autofixed and merged (PR #$PR)"
-echo "==> demo inventory: bug 1 closed+labeled ($LABEL, $CLASS_LABEL), bugs 2/3 open, no open PRs"
+echo "==> demo inventory: bug 1 closed+labeled ($LABEL, $CLASS_LABEL), bug 2 + request open, no open PRs (the reserved bug arrives via the signaling layer)"
