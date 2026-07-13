@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # One-shot fixer runner: GitHub issue number in, open PR out.
 #
-#   harness/run.sh <issue-number> [note]
+#   harness/run.sh [--replay] <issue-number> [note]
 #
 # The optional note is the operator's judgment, already posted to the issue as
 # a comment by the dispatcher. It is spliced into the fixed prompt as a "note
 # from the team" section — added context between the bug report and the
 # contract, never a replacement for either.
+#
+# --replay applies the agent-output cache entry for the issue's title
+# (harness/private/cache/, written by harness/capture.sh) instead of spawning
+# the fixer; branch, commit, push, PR, and everything downstream run for real.
+# A build-time iteration and pre-run tool only: replay never certifies, and a
+# replayed run is never presented as live. Nothing replays without this flag.
 #
 # The agent only diagnoses, tests, and fixes inside $APP_DIR. This script owns
 # every git operation (branch, commit, push, PR) so no plumbing step depends on
@@ -17,7 +23,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="demo-app" # config point: the directory the fixer agent is scoped to
 cd "$REPO_ROOT"
 
-ISSUE="${1:?usage: harness/run.sh <issue-number> [note]}"
+REPLAY=0
+if [[ "${1-}" == "--replay" ]]; then
+  REPLAY=1
+  shift
+fi
+
+ISSUE="${1:?usage: harness/run.sh [--replay] <issue-number> [note]}"
 NOTE="${2-}"
 
 abort() {
@@ -82,22 +94,46 @@ EOF
 mkdir -p harness/private
 RESULT_JSON="harness/private/run-issue-$ISSUE.json"
 
-echo "==> Running fixer agent on issue #$ISSUE: $TITLE"
-(cd "$APP_DIR" && claude -p "$PROMPT" --output-format json) > "$RESULT_JSON" ||
-  abort "agent exited non-zero (see $RESULT_JSON)"
+if (( REPLAY )); then
+  # Replay: canned agent, real everything-else. The cache is keyed by
+  # answer-key bug title, so the fresh cycle's issue number doesn't matter.
+  SLUG=$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' |
+    sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+  CACHE_DIR="harness/private/cache/$SLUG"
+  [[ -f "$CACHE_DIR/fix.patch" && -f "$CACHE_DIR/result.json" ]] ||
+    abort "no cache entry for \"$TITLE\" — capture a certified run with harness/capture.sh"
+  [[ -z "$NOTE" ]] ||
+    echo "WARNING: replay composes no prompt — the note is ignored here (it was already posted to the issue by the dispatcher)" >&2
 
-[[ "$(jq -r '.is_error' "$RESULT_JSON")" == "false" ]] ||
-  abort "agent reported an error (see $RESULT_JSON)"
-PR_BODY=$(jq -r '.result' "$RESULT_JSON")
-[[ -n "$PR_BODY" && "$PR_BODY" != "null" ]] || abort "agent returned no summary"
+  echo "==> REPLAY on issue #$ISSUE: $TITLE — cached fix, no agent (never present as live)"
+  git apply --3way "$CACHE_DIR/fix.patch" || abort "cached patch failed to apply"
+  cp "$CACHE_DIR/result.json" "$RESULT_JSON"
+  PR_BODY=$(jq -r '.result' "$RESULT_JSON")
+  [[ -n "$PR_BODY" && "$PR_BODY" != "null" ]] || abort "cache entry has no PR body"
 
-# keep the session transcript for the rehearsal audit
-SESSION_ID=$(jq -r '.session_id' "$RESULT_JSON")
-TRANSCRIPT="$HOME/.claude/projects/$(echo "$REPO_ROOT/$APP_DIR" | tr '/.' '--')/$SESSION_ID.jsonl"
-if [[ -f "$TRANSCRIPT" ]]; then
-  cp "$TRANSCRIPT" "harness/private/transcript-issue-$ISSUE.jsonl"
+  if [[ -f "$CACHE_DIR/transcript.jsonl" ]]; then
+    cp "$CACHE_DIR/transcript.jsonl" "harness/private/transcript-issue-$ISSUE.jsonl"
+  else
+    echo "WARNING: cache entry has no transcript — downstream trace artifacts will lack it" >&2
+  fi
 else
-  echo "WARNING: session transcript not found at $TRANSCRIPT — rehearsal audit will lack it" >&2
+  echo "==> Running fixer agent on issue #$ISSUE: $TITLE"
+  (cd "$APP_DIR" && claude -p "$PROMPT" --output-format json) > "$RESULT_JSON" ||
+    abort "agent exited non-zero (see $RESULT_JSON)"
+
+  [[ "$(jq -r '.is_error' "$RESULT_JSON")" == "false" ]] ||
+    abort "agent reported an error (see $RESULT_JSON)"
+  PR_BODY=$(jq -r '.result' "$RESULT_JSON")
+  [[ -n "$PR_BODY" && "$PR_BODY" != "null" ]] || abort "agent returned no summary"
+
+  # keep the session transcript for the rehearsal audit
+  SESSION_ID=$(jq -r '.session_id' "$RESULT_JSON")
+  TRANSCRIPT="$HOME/.claude/projects/$(echo "$REPO_ROOT/$APP_DIR" | tr '/.' '--')/$SESSION_ID.jsonl"
+  if [[ -f "$TRANSCRIPT" ]]; then
+    cp "$TRANSCRIPT" "harness/private/transcript-issue-$ISSUE.jsonl"
+  else
+    echo "WARNING: session transcript not found at $TRANSCRIPT — rehearsal audit will lack it" >&2
+  fi
 fi
 
 # The agent's test runs append to the runtime files (tests isolate TASKS_FILE

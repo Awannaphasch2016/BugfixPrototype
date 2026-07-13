@@ -5,15 +5,26 @@ directory; this directory owns everything deterministic.
 
 ## Scripts
 
-- `run.sh <issue-number> [note]` — the one visible demo action: fetches the
-  issue, branches, runs the fixer agent (Claude Code, non-interactive, scoped
-  to `demo-app/`), then commits, pushes, and opens the PR itself. The optional
-  note (the operator's judgment, already on the issue as a comment by the time
-  the runner starts) is spliced into the fixed prompt as a "note from the
-  team" section between the bug report and the contract — added context, never
-  a replacement. Fails cleanly (nothing pushed) if the agent errors, changes
-  nothing, or touches files outside the app. Agent output and session
-  transcript land in `harness/private/` for the rehearsal audit.
+- `run.sh [--replay] <issue-number> [note]` — the one visible demo action:
+  fetches the issue, branches, runs the fixer agent (Claude Code,
+  non-interactive, scoped to `demo-app/`), then commits, pushes, and opens the
+  PR itself. The optional note (the operator's judgment, already on the issue
+  as a comment by the time the runner starts) is spliced into the fixed prompt
+  as a "note from the team" section between the bug report and the contract —
+  added context, never a replacement. Fails cleanly (nothing pushed) if the
+  agent errors, changes nothing, or touches files outside the app. Agent
+  output and session transcript land in `harness/private/` for the rehearsal
+  audit. `--replay` swaps the fixer for the agent-output cache entry matching
+  the issue's title (canned agent, real everything-else) — a build-time
+  iteration and pre-run tool; replay never certifies a bug as demo-ready, a
+  replayed run is never presented as live, and nothing replays without the
+  explicit flag.
+- `capture.sh <issue-number>` — saves a rehearsal-certified attempt into the
+  agent-output cache (`harness/private/cache/`, gitignored with the answer
+  key): the fix as a patch keyed by answer-key bug title, plus its transcript
+  and result JSON. Capture only after the rehearsal ritual passes; any
+  prompt-shape change makes the whole cache stale as evidence — recapture from
+  freshly certified runs.
 - `reset.sh` — starts a fresh demo cycle: force-resets main (local + GitHub)
   to the `demo-baseline` tag, closes open PRs, deletes `fix/*` branches,
   retires the previous cycle's issues (closed as "not planned"; completed ones
