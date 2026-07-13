@@ -19,3 +19,7 @@ export function ghCmd(): string {
 export function gitCmd(): string {
   return process.env.CHAT_GIT_CMD ?? "git";
 }
+
+export function redactCmd(): string {
+  return process.env.CHAT_REDACT_CMD ?? path.join(repoRoot(), "harness", "redact.py");
+}
