@@ -90,8 +90,21 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
   the planted bugs are unknown to the author.
 - **Demo gesture** — the one UI action that makes a bug (or its fix) visible to the
   audience in seconds.
+- **Trigger step** — the scripted, deterministic action that makes a reserved
+  bug's error signature fire in the logs on cue, so the audience watches
+  detection, routing, and issue-filing happen live. A demo gesture aimed at the
+  signaling layer instead of at the audience's eyes.
+- **Scene** — one beat of the walkthrough script, written as a user story. The
+  scene list is the scoping constraint: nothing is built that no scene requires.
 - **Baseline** — the tagged repo state with bugs planted, logs seeded, suite green.
   **Reset** rewinds the code to it and starts a fresh demo cycle: the old cycle's
   issues are retired, and fresh issues are filed with clean timelines.
 - **Rehearsal ritual** — reset → run → audit transcript; a bug is demo-ready only
   after this passes with the exact demo-day configuration.
+- **Agent-output cache** — the answer-key store of rehearsal-certified fix
+  patches (against the baseline) and their transcripts, keyed by answer-key
+  bug title. Captured only from runs that passed the rehearsal ritual.
+- **Replay mode** — the runner mode that applies a cached patch and transcript
+  instead of spawning the fixer agent, while everything downstream (git, PR,
+  comments, gates) runs for real. A development and pre-run tool; a replayed
+  run is never presented as live — the record stays real.
