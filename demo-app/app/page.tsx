@@ -57,7 +57,7 @@ function TaskRow({
         <span
           onClick={() => setEditing(true)}
           className={`flex-1 cursor-text text-sm ${
-            task.completed ? "text-zinc-500 line-through" : "text-zinc-100"
+            task.completed ? "text-green-600 line-through" : "text-green-300"
           }`}
           title="Click to rename"
         >
