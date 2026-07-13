@@ -102,9 +102,10 @@ $BODY
 ${NOTE_SECTION}## Your job
 
 1. Investigate and find the root cause. Consult the project documentation in docs/ (the runbook's investigation method, the coding standards) and follow where it applies. Read the code; if the report mentions application logs, interrogate them (grep, jq) and correlate what you find with the code paths involved.
-2. Be decisive: one diagnosis, with the evidence (files, line references, exact log lines if logs were involved).
-3. Plan the smallest correct fix: which file(s) to change and how, and the regression test at the API route-handler seam that will fail against the current code for the reported reason and pass with the fix. Exception: if the fix is purely presentational (styling only — no API route's behavior changes), plan no test and say why no route-level test can capture the change.
-4. Make NO changes: do not edit files, do not create files, do not run git. Reading, grepping, and running the existing test suite are fine.
+2. Not every report is a defect. If the report — together with any note from the team — asks for a change of preference or presentation rather than describing broken behavior, your diagnosis is what the current code does today and your plan is the smallest change that honors exactly what was asked. Do not go hunting for an underlying defect that is not there, and do not plan changes on axes nobody asked about.
+3. Be decisive: one diagnosis, with the evidence (files, line references, exact log lines if logs were involved).
+4. Plan the smallest correct fix: which file(s) to change and how, and the regression test at the API route-handler seam that will fail against the current code for the reported reason and pass with the fix. Exception: if the fix is purely presentational (styling only — no API route's behavior changes), plan no test and say why no route-level test can capture the change.
+5. Make NO changes: do not edit files, do not create files, do not run git. Reading, grepping, and running the existing test suite are fine.
 
 When you are done, your final reply must be pure markdown, with no preamble or closing remarks around it:
 - "## Diagnosis" — the root cause and how the evidence points to it
@@ -258,7 +259,11 @@ else
   REVIEWER_PROMPT=$(cat <<EOF
 You are the reviewer in a pipeline that fixes reported bugs in this task-management app: one post-hoc pass over a just-opened PR, informing the human who decides whether to merge. You report; you never change code, and there is no revision loop. This directory is the entire application, already containing the change under review.
 
-## The PR under review — fixes issue #$ISSUE: $TITLE
+## The original report (issue #$ISSUE): $TITLE
+
+$BODY
+
+${NOTE_SECTION}## The PR under review
 
 $PR_BODY
 
@@ -270,7 +275,7 @@ $DIFF
 
 ## Your job
 
-1. Judge the change against the project documentation in docs/ (coding standards, the runbook's testing conventions) and for actual defects: logic errors, missed edge cases at the API boundary, a regression test that would still pass if the bug were reintroduced differently, scope creep beyond the smallest fix.
+1. Judge the change against the original report, the note, and the project documentation in docs/ (coding standards, the runbook's testing conventions), and for actual defects: logic errors, missed edge cases at the API boundary, a regression test that would still pass if the bug were reintroduced differently, scope creep beyond what the report and note asked for. The note from the team, when present, is an instruction the operator put on the record at dispatch: a change it explicitly requested is in scope by definition — judge whether the diff honors it with the smallest change, never whether it should have been requested.
 2. Read whatever code you need for context; run the test suite if it sharpens a finding. Do not edit files; do not run git.
 3. Rate each candidate issue 0-100 confidence and report ONLY issues at 80 or above, grouped Critical (90-100) and Important (80-89), each with file, line, why it matters, and a concrete fix. If nothing clears the bar, confirm the change meets the standards in two or three sentences naming what you checked.
 
@@ -300,6 +305,10 @@ if [[ -n "$REVIEW_COMMENT" ]]; then
     echo "WARNING: could not post the review comment — PR #$PR_NUMBER stands unreviewed" >&2
   fi
 fi
+
+# The reviewer's test runs dirty the runtime files exactly like the fixer's
+# did — restore them so a bare run.sh finds a clean tree next time.
+git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
 
 # Stage wall clocks feed the narration schedule (what the operator shows
 # during each wait).

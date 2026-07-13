@@ -170,6 +170,12 @@ printf '## Review — reviewer agent\n\n%s' "$REVIEW_RESULT" > "$OUT/expected-re
 cmp -s "$OUT/expected-review-comment.txt" "$OUT/pr-comment-1.txt" ||
   fail "review comment is not byte-identical to the reviewer output"
 grep -q '```diff' "$OUT/reviewer-prompt.txt" || fail "reviewer prompt lacks the diff"
+grep -q "## The original report (issue #7): Stub bug title" "$OUT/reviewer-prompt.txt" ||
+  fail "reviewer prompt lacks the original report"
+grep -q "## Note from the team" "$OUT/reviewer-prompt.txt" ||
+  fail "reviewer prompt lacks the operator note"
+grep -q "use green for the text in the todo list" "$OUT/reviewer-prompt.txt" ||
+  fail "reviewer prompt note text not verbatim"
 
 # 5. no silent replay; --replay without a cache aborts clean
 grep -q "REPLAY" "$OUT/run.log" && fail "normal dispatch mentioned replay"

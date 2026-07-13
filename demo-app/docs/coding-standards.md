@@ -51,8 +51,10 @@ them in the same PR.
 - Tests isolate state by pointing `TASKS_FILE` at a fresh temp dir in
   `beforeEach` and building their own fixtures through the API.
 - Every bug fix ships with a regression test that failed for the reported
-  reason before the fix. `npm test` and `npm run lint` must be green before
-  merge.
+  reason before the fix. Purely presentational changes — where no API route's
+  behavior changes — are exempt; the PR must say in a sentence why no
+  route-level test applies. `npm test` and `npm run lint` must be green
+  before merge.
 
 ## Change discipline
 
@@ -65,8 +67,9 @@ them in the same PR.
 - Tailwind v4 (PostCSS plugin). Utility classes inline in JSX; the only
   stylesheet is `app/globals.css`, which holds the theme tokens and base
   styles.
-- The app is dark-theme only (`color-scheme: dark`), built on the zinc
-  palette; conditional styling is done with template-literal class strings,
-  not styled-components or CSS modules.
+- The app is dark-theme only (`color-scheme: dark`); the base theme is built
+  on the zinc palette. Deliberate accent changes the team asks for are fine —
+  keep them scoped to exactly what was asked. Conditional styling is done
+  with template-literal class strings, not styled-components or CSS modules.
 - Extract a component when markup repeats, not before (`TaskRow`, `DueBadge`
   are the pattern).
