@@ -29,7 +29,7 @@ export async function PATCH(
   try {
     taskSchema.parse(updated);
   } catch (err) {
-    log.error({ err, taskId: id }, "task update failed validation");
+    log.warn({ err, taskId: id }, "task update failed validation");
     return Response.json(
       { error: "task update failed validation" },
       { status: 400 }
