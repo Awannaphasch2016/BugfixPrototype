@@ -24,7 +24,7 @@ export async function PATCH(
     ...existing,
     title: typeof body.title === "string" ? body.title.trim() : existing.title,
     completed: typeof body.completed === "boolean" ? body.completed : existing.completed,
-    dueDate: body.dueDate,
+    dueDate: body.dueDate === undefined ? existing.dueDate : body.dueDate,
   };
   try {
     taskSchema.parse(updated);
