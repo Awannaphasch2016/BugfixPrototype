@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Task, TaskPatch } from "@/lib/tasks";
 
 function DueBadge({ dueDate }: { dueDate: string | null }) {
@@ -78,17 +78,21 @@ export default function Home() {
   const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const query = filter === "all" ? "" : `?status=${filter}`;
     const res = await fetch(`/api/tasks${query}`);
     const data = await res.json();
     setTasks(data.tasks);
-  }
+  }, [filter]);
 
   useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+    // Fetch-on-change: refresh() sets state only after awaiting the API, but
+    // the rule's reachability analysis cannot tell that from a synchronous
+    // cascade. Suppressed deliberately rather than restructured — see
+    // docs/coding-standards.md, change discipline.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refresh();
+  }, [refresh]);
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault();

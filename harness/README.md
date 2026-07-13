@@ -17,9 +17,15 @@ directory; this directory owns everything deterministic.
   section between the bug report and the contract — added context, never a
   replacement; the plan section follows it, and the contract stays last.
   Per-stage wall clocks land in `harness/private/stages-issue-<n>.json`.
-  Prompt composition is verified byte-for-byte by
-  `harness/tests/prompt-shape.sh` (stubbed `claude`/`gh` in a throwaway
-  clone — no network, no agent). Fails cleanly (nothing pushed) if the
+  Between commit and push the runner executes the gates (ADR-0003): the
+  app's suite and lint, plus red-on-baseline — main's app code under the
+  branch's tests must fail for the reported reason; a gate failure aborts
+  before anything is pushed, and the formatted gate report is posted to the
+  PR. Each stage's transcript is also rendered to static HTML
+  (claude-code-log) that the chat serves at `/api/trace/<issue>` and links
+  from the PR card. Prompt composition and gate/report mechanics are
+  verified byte-for-byte by `harness/tests/prompt-shape.sh` (stubbed
+  `claude`/`gh`/`npm` in a throwaway clone — no network, no agent). Fails cleanly (nothing pushed) if the
   agent errors, changes nothing, or touches files outside the app. Agent
   output and session transcript land in `harness/private/` for the rehearsal
   audit. `--replay` swaps the fixer for the agent-output cache entry matching

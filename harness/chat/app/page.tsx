@@ -369,6 +369,13 @@ export default function Home() {
               <a href={msg.prUrl} target="_blank" rel="noreferrer">
                 view PR
               </a>
+              <a
+                href={`/api/trace/${msg.issue.number}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                view trace
+              </a>
             </div>
             {msg.state === "merged" ? (
               <div className="card-status">Merged — live in the app.</div>

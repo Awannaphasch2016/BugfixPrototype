@@ -229,6 +229,39 @@ done <<<"$CHANGED"
 git commit -q -m "Fix #$ISSUE: $TITLE" \
   -m "$PR_BODY" \
   -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# ---- gates (ADR-0003): tests + lint inside the runner, fail before push ----
+echo "==> [gates] suite + lint with the fix applied"
+if ! TEST_OUT=$(cd "$APP_DIR" && npm test 2>&1); then
+  echo "$TEST_OUT" | tail -20 >&2
+  abort "gate failed: test suite red with the fix applied"
+fi
+TESTS_GREEN_LINE=$(echo "$TEST_OUT" | grep -E '^[[:space:]]*Tests[[:space:]]' | head -1 | xargs)
+if ! LINT_OUT=$(cd "$APP_DIR" && npm run lint 2>&1); then
+  echo "$LINT_OUT" | tail -20 >&2
+  abort "gate failed: lint"
+fi
+
+# Red-on-baseline: put main's app code under the branch's tests — the new
+# regression test must fail against the unfixed code, for the report's reason.
+RED_LINE="not demonstrated — no test files changed (presentational exception)"
+CHANGED_TESTS=$(git diff --name-only main "$BRANCH" -- "$APP_DIR/tests" || true)
+NON_TEST_CHANGED=$(git diff --name-only main "$BRANCH" | grep -v "^$APP_DIR/tests/" || true)
+if [[ -n "$CHANGED_TESTS" && -n "$NON_TEST_CHANGED" ]]; then
+  # shellcheck disable=SC2086
+  git checkout -q main -- $NON_TEST_CHANGED
+  if BASELINE_OUT=$(cd "$APP_DIR" && npm test 2>&1); then
+    git checkout -q "$BRANCH" -- .
+    abort "gate failed: regression test is green on baseline code — it proves nothing"
+  fi
+  RED_COUNT_LINE=$(echo "$BASELINE_OUT" | grep -E '^[[:space:]]*Tests[[:space:]]' | head -1 | xargs)
+  git checkout -q "$BRANCH" -- .
+  RED_LINE="red on baseline ($RED_COUNT_LINE) → green with fix ($TESTS_GREEN_LINE)"
+fi
+# test runs dirty the runtime files; the branch's versions are the clean ones
+git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
+echo "==> [gates] green — $TESTS_GREEN_LINE; lint clean; regression: $RED_LINE"
+
 git push -q -u origin "$BRANCH"
 
 if ! PR_URL=$(gh pr create --base main --head "$BRANCH" \
@@ -241,6 +274,16 @@ Closes #$ISSUE"); then
   abort "gh pr create failed — remote branch removed, nothing published"
 fi
 PR_NUMBER="${PR_URL##*/}"
+
+# The gate evidence goes on the record (ADR-0001): a formatted report on the
+# PR, informing the human merge decision alongside the review.
+GATE_REPORT=$(printf '## Gates — runner\n\n- Suite with the fix: %s\n- Lint: clean\n- Regression test: %s\n\nGates execute inside the runner; a failure aborts the attempt before anything is pushed (ADR-0003).' \
+  "$TESTS_GREEN_LINE" "$RED_LINE")
+if gh pr comment "$PR_NUMBER" --body "$GATE_REPORT" >/dev/null; then
+  echo "==> [gates] report posted to PR #$PR_NUMBER"
+else
+  echo "WARNING: could not post the gate report to PR #$PR_NUMBER" >&2
+fi
 
 # ---- reviewer stage --------------------------------------------------------
 # One post-hoc pass, findings posted as a PR comment to inform the human merge
@@ -316,6 +359,18 @@ jq -n --argjson planner "$PLANNER_SECS" --argjson fixer "$FIXER_SECS" \
   --argjson reviewer "$REVIEWER_SECS" --argjson replay "$REPLAY" \
   '{planner: $planner, fixer: $fixer, reviewer: $reviewer, replay: ($replay == 1)}' \
   > "harness/private/stages-issue-$ISSUE.json"
+
+# ---- trace: render this attempt's transcripts to static local HTML ---------
+# (claude-code-log, installed at setup by install.sh; the chat serves these
+# via /api/trace/<issue>. A render failure costs the trace link, not the run.)
+for SUFFIX in "" "-planner" "-reviewer"; do
+  TRANSCRIPT_SRC="harness/private/transcript-issue-$ISSUE$SUFFIX.jsonl"
+  if [[ -f "$TRANSCRIPT_SRC" ]]; then
+    pipx run claude-code-log "$TRANSCRIPT_SRC" \
+      -o "harness/private/trace-issue-$ISSUE$SUFFIX.html" >/dev/null 2>&1 ||
+      echo "WARNING: trace render failed for $TRANSCRIPT_SRC" >&2
+  fi
+done
 
 git checkout -q main
 echo "==> PR ready for review: $PR_URL"

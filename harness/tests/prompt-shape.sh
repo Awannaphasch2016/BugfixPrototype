@@ -105,7 +105,18 @@ case "$1 $2" in
   *) echo "gh stub: unexpected args: $*" >&2; exit 1 ;;
 esac
 STUB
-chmod +x "$TMP/bin/claude" "$TMP/bin/gh"
+# ---- stub npm: gates always green, with a parseable suite line -------------
+cat > "$TMP/bin/npm" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "npm $*" >> "$STUB_OUT/npm.log"
+case "$*" in
+  test)       printf ' Test Files  1 passed (1)\n      Tests  11 passed (11)\n' ;;
+  "run lint") : ;;
+  *) echo "npm stub: unexpected args: $*" >&2; exit 1 ;;
+esac
+STUB
+chmod +x "$TMP/bin/claude" "$TMP/bin/gh" "$TMP/bin/npm"
 
 # ---- throwaway world: bare origin + clone ----------------------------------
 git clone -q --bare "$REPO_ROOT" "$TMP/origin.git"
@@ -164,10 +175,15 @@ grep -q "## Bug report (issue #7): Stub bug title" "$OUT/planner-prompt.txt" ||
 grep -q "Make NO changes" "$OUT/planner-prompt.txt" ||
   fail "planner prompt lacks the read-only contract"
 
-# 4. reviewer: exactly one attributed PR comment carrying the canned verdict
-[[ "$(cat "$OUT/pr-comments")" == "1" ]] || fail "expected exactly one PR comment"
+# 4. PR comments: the gate report first, then exactly one attributed review
+[[ "$(cat "$OUT/pr-comments")" == "2" ]] || fail "expected gate report + review = two PR comments"
+grep -q "^## Gates — runner" "$OUT/pr-comment-1.txt" || fail "first PR comment is not the gate report"
+grep -q "Suite with the fix: Tests 11 passed (11)" "$OUT/pr-comment-1.txt" ||
+  fail "gate report lacks the parsed suite line"
+grep -q "presentational exception" "$OUT/pr-comment-1.txt" ||
+  fail "gate report lacks the regression line (stub change has no test files)"
 printf '## Review — reviewer agent\n\n%s' "$REVIEW_RESULT" > "$OUT/expected-review-comment.txt"
-cmp -s "$OUT/expected-review-comment.txt" "$OUT/pr-comment-1.txt" ||
+cmp -s "$OUT/expected-review-comment.txt" "$OUT/pr-comment-2.txt" ||
   fail "review comment is not byte-identical to the reviewer output"
 grep -q '```diff' "$OUT/reviewer-prompt.txt" || fail "reviewer prompt lacks the diff"
 grep -q "## The original report (issue #7): Stub bug title" "$OUT/reviewer-prompt.txt" ||

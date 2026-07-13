@@ -28,3 +28,8 @@ fi
 echo "Reach Marie Curie at marie@example.com or 555-0100." \
   | "$(dirname "${BASH_SOURCE[0]}")/redact.py" >/dev/null
 echo "redact.py smoke test passed"
+
+# Trace renderer (M2): transcripts → static HTML, invoked by run.sh per
+# attempt via `pipx run` (cached after the first use — warm it here so demo
+# day never downloads).
+pipx run claude-code-log --help >/dev/null 2>&1 && echo "claude-code-log ready"
