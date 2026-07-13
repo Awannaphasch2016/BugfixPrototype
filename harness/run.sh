@@ -285,6 +285,122 @@ else
   echo "WARNING: could not post the gate report to PR #$PR_NUMBER" >&2
 fi
 
+# ---- tester stage -----------------------------------------------------------
+# The tester drives the running app in a real browser (Playwright MCP):
+# reproduces the reported symptom on main's code, verifies its absence with
+# the fix. The RUNNER flips the working tree between phases (the dev server
+# hot-reloads); the tester only looks. Evidence is committed to the PR branch
+# and embedded in the PR body by durable raw URL — the gh CLI cannot upload
+# images to comments. The PR is already published, so a tester failure warns
+# and skips, never aborts.
+TESTER_SECS=0
+EVIDENCE_DIR="evidence/issue-$ISSUE"
+APP_URL="${TESTER_APP_URL:-http://localhost:3000}"
+EVIDENCE_MD=""
+if (( REPLAY )); then
+  if [[ -d "$CACHE_DIR/evidence" ]]; then
+    mkdir -p "$EVIDENCE_DIR"
+    cp "$CACHE_DIR/evidence/"*.png "$EVIDENCE_DIR/" 2>/dev/null || true
+    EVIDENCE_MD=$(cat "$CACHE_DIR/evidence/evidence.md" 2>/dev/null || echo "")
+  else
+    echo "WARNING: cache entry has no evidence/ — tester artifact skipped in replay" >&2
+  fi
+elif ! curl -sf "$APP_URL" -o /dev/null; then
+  echo "WARNING: demo app not reachable at $APP_URL — tester stage skipped (start it with: cd $APP_DIR && npm run dev)" >&2
+else
+  # Screenshot filenames resolve against the MCP server's cwd (= $APP_DIR),
+  # NOT --output-dir — only the session exhaust (page snapshots, console
+  # logs) goes to the staging dir. See the playwright-mcp-localhost skill.
+  TESTER_STAGING=$(mktemp -d)
+  MCP_CONFIG=$(jq -n --arg out "$TESTER_STAGING" \
+    '{mcpServers: {playwright: {command: "npx",
+      args: ["@playwright/mcp@latest", "--browser", "chromium", "--headless",
+             "--isolated", "--output-dir", $out]}}}')
+
+  tester_phase() { # <phase-label> <instruction> <result-json>
+    (cd "$APP_DIR" && claude -p "$(cat <<EOF
+You are the tester in a pipeline that fixes reported bugs in this task-management app. You have browser tools (Playwright); the app under test is running at $APP_URL. This directory holds the app's source for reference only.
+
+## The report (issue #$ISSUE): $TITLE
+
+$BODY
+
+${NOTE_SECTION}## Your job — phase: $1
+
+$2
+
+Rules: drive only $APP_URL in the browser; take screenshots with the browser screenshot tool passing exactly the .png filenames instructed (they will be written into this directory by the tool — that is expected and allowed); do not modify the app's source or any other file; do not run git.
+
+Your final reply must be pure markdown, no preamble: one short paragraph of the steps you drove and what the screenshot shows, then a line per screenshot: \`filename.png — <one-line caption>\`.
+EOF
+)" --output-format json --mcp-config "$MCP_CONFIG") > "$3"
+  }
+
+  FIX_FILES=$(git diff --name-only main "$BRANCH")
+  echo "==> [tester] reproducing the symptom on main's code"
+  STAGE_T0=$SECONDS
+  # shellcheck disable=SC2086
+  git checkout -q main -- $FIX_FILES
+  TESTER_BEFORE_JSON="harness/private/tester-before-issue-$ISSUE.json"
+  TESTER_OK=1
+  tester_phase "reproduce the reported symptom on the CURRENT build (it should be present)" \
+    "Derive the user-visible symptom from the report, drive the app until it is visible, and capture it in screenshot(s) named before-<aspect>.png. If you cannot make the symptom appear, say so plainly — do not fake it." \
+    "$TESTER_BEFORE_JSON" || TESTER_OK=0
+  git checkout -q "$BRANCH" -- .
+
+  TESTER_AFTER_JSON="harness/private/tester-after-issue-$ISSUE.json"
+  if (( TESTER_OK )); then
+    echo "==> [tester] verifying the fix"
+    tester_phase "verify the symptom is GONE on the current build (the fix is applied)" \
+      "Repeat the same steps that showed the symptom and capture the healthy behavior in screenshot(s) named after-<aspect>.png. State plainly whether the symptom is gone." \
+      "$TESTER_AFTER_JSON" || TESTER_OK=0
+  fi
+  git checkout -q "$BRANCH" -- .
+  git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
+  TESTER_SECS=$((SECONDS - STAGE_T0))
+
+  if (( TESTER_OK )) &&
+    [[ "$(jq -r '.is_error' "$TESTER_BEFORE_JSON")" == "false" ]] &&
+    [[ "$(jq -r '.is_error' "$TESTER_AFTER_JSON")" == "false" ]] &&
+    compgen -G "$APP_DIR/before-*.png" >/dev/null &&
+    compgen -G "$APP_DIR/after-*.png" >/dev/null; then
+    mkdir -p "$EVIDENCE_DIR"
+    mv "$APP_DIR"/before-*.png "$APP_DIR"/after-*.png "$EVIDENCE_DIR/"
+    EVIDENCE_MD=$(printf '### Symptom on the baseline\n\n%s\n\n### With the fix\n\n%s' \
+      "$(jq -r '.result' "$TESTER_BEFORE_JSON")" "$(jq -r '.result' "$TESTER_AFTER_JSON")")
+    save_transcript "$TESTER_BEFORE_JSON" "-tester-before"
+    save_transcript "$TESTER_AFTER_JSON" "-tester-after"
+    echo "==> [tester] symptom reproduced and verified fixed (${TESTER_SECS}s)"
+  else
+    rm -f "$APP_DIR"/before-*.png "$APP_DIR"/after-*.png
+    echo "WARNING: tester stage produced no usable evidence — PR stands without screenshots" >&2
+  fi
+fi
+
+if [[ -n "$EVIDENCE_MD" && -d "$EVIDENCE_DIR" ]]; then
+  git add "$EVIDENCE_DIR"
+  git commit -q -m "Evidence: browser verification for #$ISSUE" \
+    -m "Before/after screenshots taken by the tester agent in a real browser (Playwright). Committed to the branch because images cannot ride a CLI comment; embedded in the PR body by commit-pinned raw URL."
+  git push -q origin "$BRANCH"
+  EVIDENCE_SHA=$(git rev-parse HEAD)
+  OWNER_REPO=$(sed -E 's#https://github.com/([^/]+/[^/]+)/pull/.*#\1#' <<<"$PR_URL")
+  IMAGES_MD=""
+  for PNG in "$EVIDENCE_DIR"/*.png; do
+    IMAGES_MD+="![$(basename "$PNG")](https://raw.githubusercontent.com/$OWNER_REPO/$EVIDENCE_SHA/$PNG)"$'\n\n'
+  done
+  gh pr edit "$PR_NUMBER" --body "$PR_BODY
+
+## Evidence — tester agent
+
+$EVIDENCE_MD
+
+$IMAGES_MD
+---
+Closes #$ISSUE" >/dev/null &&
+    echo "==> [tester] evidence committed and embedded in PR #$PR_NUMBER" ||
+    echo "WARNING: could not embed the evidence in the PR body" >&2
+fi
+
 # ---- reviewer stage --------------------------------------------------------
 # One post-hoc pass, findings posted as a PR comment to inform the human merge
 # decision; no revision loop (roadmap, trust-gated). Role adapted from the
@@ -356,14 +472,16 @@ git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
 # Stage wall clocks feed the narration schedule (what the operator shows
 # during each wait).
 jq -n --argjson planner "$PLANNER_SECS" --argjson fixer "$FIXER_SECS" \
-  --argjson reviewer "$REVIEWER_SECS" --argjson replay "$REPLAY" \
-  '{planner: $planner, fixer: $fixer, reviewer: $reviewer, replay: ($replay == 1)}' \
+  --argjson tester "$TESTER_SECS" --argjson reviewer "$REVIEWER_SECS" \
+  --argjson replay "$REPLAY" \
+  '{planner: $planner, fixer: $fixer, tester: $tester, reviewer: $reviewer,
+    replay: ($replay == 1)}' \
   > "harness/private/stages-issue-$ISSUE.json"
 
 # ---- trace: render this attempt's transcripts to static local HTML ---------
 # (claude-code-log, installed at setup by install.sh; the chat serves these
 # via /api/trace/<issue>. A render failure costs the trace link, not the run.)
-for SUFFIX in "" "-planner" "-reviewer"; do
+for SUFFIX in "" "-planner" "-tester-before" "-tester-after" "-reviewer"; do
   TRANSCRIPT_SRC="harness/private/transcript-issue-$ISSUE$SUFFIX.jsonl"
   if [[ -f "$TRANSCRIPT_SRC" ]]; then
     pipx run claude-code-log "$TRANSCRIPT_SRC" \

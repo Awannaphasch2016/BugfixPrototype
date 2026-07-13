@@ -39,10 +39,21 @@ RESULT=$(jq -r '.result' "$STAGE_JSON")
    `## Your job` contract — the operator-note mechanism. Same bytes both
    places; `harness/tests/prompt-shape.sh` asserts it.
 2. **Fixer**: unchanged contract; its `.result` is the PR body.
-3. **Reviewer** (after `gh pr create`, on the fix branch): one pass, posted
-   with `gh pr comment` under `## Review — reviewer agent`. Exactly once, no
-   revision loop. Publication has happened, so reviewer failure WARNS and
-   leaves the PR unreviewed rather than aborting.
+3. **Tester** (after the gate report; needs the demo app running on :3000,
+   else skips with a warning): two phases — the RUNNER checks out main's
+   code under the dev server for the symptom screenshots, then restores the
+   branch for the verification screenshots. `claude -p` with `--mcp-config`
+   (Playwright, headless chromium, `--output-dir` staging). Evidence lands
+   as a second runner-authored commit on the PR branch (`evidence/issue-<n>/`)
+   and is embedded in the PR body by commit-pinned raw URL — the gh CLI
+   cannot attach images to comments. Failure warns and skips, never aborts.
+4. **Reviewer** (last, on the fix branch): one pass, posted with
+   `gh pr comment` under `## Review — reviewer agent`, with the original
+   report AND the operator note in its prompt — the note is an on-record
+   instruction, in scope by definition (learned the hard way; see bugs.md,
+   request rehearsal 1, Stage 4). Exactly once, no revision loop.
+   Publication has happened, so reviewer failure WARNS and leaves the PR
+   unreviewed rather than aborting.
 
 Stage wall clocks land in `harness/private/stages-issue-<n>.json` — the
 narration schedule reads them.

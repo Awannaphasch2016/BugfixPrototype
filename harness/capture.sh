@@ -41,14 +41,15 @@ PR=$(gh pr list --state merged --limit 500 --json number,headRefName \
 git fetch -q origin "refs/pull/$PR/head"
 HEAD_SHA=$(git rev-parse FETCH_HEAD)
 
-# The runner commits each attempt as exactly one single-parent commit, so the
-# commit's own diff is the fix — independent of whatever else was on main in
-# its cycle.
-[[ $(git show -s --format=%P "$HEAD_SHA" | wc -w) -eq 1 ]] ||
-  { echo "ERROR: PR #$PR head $HEAD_SHA is not a single-parent fixer commit" >&2; exit 1; }
+# The fixer's work is the PR's FIRST commit (a later commit, when present, is
+# the runner-committed tester evidence), and it is single-parent, so its own
+# diff is the fix — independent of whatever else was on main in its cycle.
+FIX_SHA=$(gh pr view "$PR" --json commits --jq '.commits[0].oid')
+[[ $(git show -s --format=%P "$FIX_SHA" | wc -w) -eq 1 ]] ||
+  { echo "ERROR: PR #$PR first commit $FIX_SHA is not a single-parent fixer commit" >&2; exit 1; }
 
 mkdir -p "$CACHE_DIR"
-git diff "$HEAD_SHA~1" "$HEAD_SHA" -- demo-app > "$CACHE_DIR/fix.patch"
+git diff "$FIX_SHA~1" "$FIX_SHA" -- demo-app > "$CACHE_DIR/fix.patch"
 [[ -s "$CACHE_DIR/fix.patch" ]] ||
   { echo "ERROR: empty patch from PR #$PR" >&2; rm -f "$CACHE_DIR/fix.patch"; exit 1; }
 
@@ -101,11 +102,26 @@ else
   rm -f "$CACHE_DIR/review.md"
   echo "WARNING: no review comment on PR #$PR — replay will skip the reviewer artifact" >&2
 fi
-for STAGE in planner reviewer; do
+for STAGE in planner tester-before tester-after reviewer; do
   if [[ -f "harness/private/transcript-issue-$ISSUE-$STAGE.jsonl" ]]; then
     cp "harness/private/transcript-issue-$ISSUE-$STAGE.jsonl" "$CACHE_DIR/transcript-$STAGE.jsonl"
   fi
 done
+
+# Tester evidence: screenshots from the PR head tree plus the narrative from
+# the PR body (image links are NOT cached — replay re-pins them to its own
+# evidence commit).
+if git ls-tree -r --name-only "$HEAD_SHA" -- "evidence/issue-$ISSUE" | grep -q .; then
+  rm -rf "$CACHE_DIR/evidence"
+  mkdir -p "$CACHE_DIR/evidence"
+  git archive "$HEAD_SHA" "evidence/issue-$ISSUE" | tar -x --strip-components=2 -C "$CACHE_DIR/evidence"
+  gh pr view "$PR" --json body --jq .body |
+    awk '/^## Evidence — tester agent$/{f=1; next} f && (/^!\[/ || /^---$/){exit} f' \
+    > "$CACHE_DIR/evidence/evidence.md"
+else
+  rm -rf "$CACHE_DIR/evidence"
+  echo "WARNING: PR #$PR carries no evidence/ — replay will skip the tester artifact" >&2
+fi
 
 jq -n --arg title "$TITLE" --arg slug "$SLUG" \
   --argjson issue "$ISSUE" --argjson pr "$PR" \

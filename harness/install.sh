@@ -33,3 +33,23 @@ echo "redact.py smoke test passed"
 # attempt via `pipx run` (cached after the first use — warm it here so demo
 # day never downloads).
 pipx run claude-code-log --help >/dev/null 2>&1 && echo "claude-code-log ready"
+
+# Tester role (M3): Playwright MCP + its chromium browser. Two setup-time
+# downloads so demo day never fetches anything:
+#   1. Warm the npx cache for @playwright/mcp (the runner spawns it via
+#      `npx @playwright/mcp@latest`).
+#   2. Download the chromium build pinned by the MCP's *bundled* Playwright —
+#      via the MCP's own `install-browser` subcommand, never a bare
+#      `npx playwright install` (that resolves a different Playwright version
+#      and can download a browser build the MCP won't use). "chrome-for-testing"
+#      is the distribution the MCP's `--browser chromium` flag maps to in
+#      v0.0.78; both target names are requested so a rename in a future
+#      version fails loudly here, at setup.
+# Both steps are idempotent: npx reuses its cache and install-browser skips
+# browsers already in ~/.cache/ms-playwright. See the playwright-mcp-localhost
+# skill for the runtime invocation and its gotchas.
+APP_DIR="$(dirname "${BASH_SOURCE[0]}")/../demo-app"
+(cd "$APP_DIR" && npx --yes @playwright/mcp@latest --help >/dev/null 2>&1) &&
+  echo "@playwright/mcp npx cache warm"
+(cd "$APP_DIR" && npx --yes @playwright/mcp@latest install-browser chromium chrome-for-testing >/dev/null 2>&1) &&
+  echo "Playwright MCP chromium browser installed"

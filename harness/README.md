@@ -10,8 +10,12 @@ directory; this directory owns everything deterministic.
   its plan to the issue as an attributed comment before any commit exists;
   the **fixer** implements (Claude Code, non-interactive, scoped to
   `demo-app/`) with the plan spliced additively into its prompt; the runner
-  commits, pushes, and opens the PR itself; the **reviewer** then posts one
-  post-hoc findings comment on the PR — no revision loop. The optional note
+  commits, pushes, and opens the PR itself; the **tester** reproduces the
+  symptom in a real browser on main's code and verifies its absence with the
+  fix (screenshots committed to the branch under `evidence/`, embedded in
+  the PR body — skipped with a warning if the app isn't running on :3000);
+  the **reviewer** then posts one post-hoc findings comment on the PR — no
+  revision loop. The optional note
   (the operator's judgment, already on the issue as a comment by the time the
   runner starts) is spliced into the fixed prompt as a "note from the team"
   section between the bug report and the contract — added context, never a
