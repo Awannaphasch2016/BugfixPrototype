@@ -100,6 +100,19 @@ describe("PATCH /api/tasks/:id", () => {
     expect(list.tasks[0].dueDate).toBeNull();
   });
 
+  it("does not delete a task when the patched result fails validation", async () => {
+    const longTitle = "x".repeat(120); // POST accepts this today; schema caps titles at 100
+    const { task } = await (await createTask({ title: longTitle })).json();
+
+    const res = await patchTask(task.id, { completed: true });
+    expect(res.status).toBe(400);
+
+    const list = await (await listTasks()).json();
+    expect(list.tasks).toHaveLength(1);
+    expect(list.tasks[0].id).toBe(task.id);
+    expect(list.tasks[0].completed).toBe(false);
+  });
+
   it("404s for an unknown task id", async () => {
     const res = await patchTask("does-not-exist", { completed: true });
     expect(res.status).toBe(404);
