@@ -94,4 +94,14 @@ describe("GET /api/tasks", () => {
     expect(list.tasks).toHaveLength(1);
     expect(list.tasks[0].title).toBe("Ship v2");
   });
+
+  it("lists only completed tasks with ?status=done", async () => {
+    const { task: done } = await (await createTask({ title: "Ship v1" })).json();
+    await (await createTask({ title: "Ship v2" })).json();
+    await patchTask(done.id, { completed: true });
+
+    const list = await (await listTasks("?status=done")).json();
+    expect(list.tasks).toHaveLength(1);
+    expect(list.tasks[0].title).toBe("Ship v1");
+  });
 });
