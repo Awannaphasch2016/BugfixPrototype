@@ -111,7 +111,12 @@ cat > "$TMP/bin/npm" <<'STUB'
 set -euo pipefail
 echo "npm $*" >> "$STUB_OUT/npm.log"
 case "$*" in
-  test)       printf ' Test Files  1 passed (1)\n      Tests  11 passed (11)\n' ;;
+  test)
+    if [[ -f "$STUB_OUT/fail-tests" ]]; then
+      printf ' Test Files  1 failed (1)\n      Tests  1 failed | 10 passed (11)\n'
+      exit 1
+    fi
+    printf ' Test Files  1 passed (1)\n      Tests  11 passed (11)\n' ;;
   "run lint") : ;;
   *) echo "npm stub: unexpected args: $*" >&2; exit 1 ;;
 esac
@@ -126,7 +131,7 @@ git -C "$TMP/repo" config user.name "prompt-shape-test"
 # test the runner as it stands in the working tree, not as last committed
 cp "$REPO_ROOT/harness/run.sh" "$TMP/repo/harness/run.sh"
 git -C "$TMP/repo" add harness/run.sh
-git -C "$TMP/repo" -c commit.gpgsign=false commit -qm "prompt-shape: runner under test" --no-verify
+git -C "$TMP/repo" -c commit.gpgsign=false commit -qm "prompt-shape: runner under test" --no-verify --allow-empty
 git -C "$TMP/repo" push -q origin main
 BASELINE_SHA=$(git -C "$TMP/repo" rev-parse HEAD)
 
@@ -193,7 +198,21 @@ grep -q "## Note from the team" "$OUT/reviewer-prompt.txt" ||
 grep -q "use green for the text in the todo list" "$OUT/reviewer-prompt.txt" ||
   fail "reviewer prompt note text not verbatim"
 
-# 5. no silent replay; --replay without a cache aborts clean
+# 5. a gate failure aborts before push: rerun with failing tests and assert
+#    the remote branch is exactly what run 1 pushed (nothing new published)
+BRANCH_SHA_BEFORE=$(git -C "$TMP/origin.git" rev-parse refs/heads/fix/issue-7)
+rm -f "$OUT/claude-calls"
+touch "$OUT/fail-tests"
+if ( cd "$TMP/repo" && PATH="$TMP/bin:$PATH" STUB_OUT="$OUT" \
+      bash harness/run.sh 7 "$NOTE_TEXT" ) > "$OUT/gate-fail.log" 2>&1; then
+  fail "run.sh should abort when the test gate is red"
+fi
+grep -q "gate failed: test suite red" "$OUT/gate-fail.log" || fail "gate abort message missing"
+[[ "$(git -C "$TMP/origin.git" rev-parse refs/heads/fix/issue-7)" == "$BRANCH_SHA_BEFORE" ]] ||
+  fail "gate failure still pushed to origin"
+rm -f "$OUT/fail-tests"
+
+# 6. no silent replay; --replay without a cache aborts clean
 grep -q "REPLAY" "$OUT/run.log" && fail "normal dispatch mentioned replay"
 if ( cd "$TMP/repo" && PATH="$TMP/bin:$PATH" STUB_OUT="$OUT" \
       bash harness/run.sh --replay 7 ) > "$OUT/replay.log" 2>&1; then
