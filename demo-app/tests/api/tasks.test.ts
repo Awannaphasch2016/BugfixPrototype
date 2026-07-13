@@ -94,6 +94,17 @@ describe("PATCH /api/tasks/:id", () => {
     const res = await patchTask("does-not-exist", { completed: true });
     expect(res.status).toBe(404);
   });
+
+  it("does not delete a task when the patched result fails validation", async () => {
+    const { task } = await (await createTask({ title: "x".repeat(120) })).json();
+
+    const res = await patchTask(task.id, { completed: true });
+
+    const list = await (await listTasks()).json();
+    expect(list.tasks).toHaveLength(1);
+    expect(list.tasks[0].id).toBe(task.id);
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("GET /api/tasks", () => {
