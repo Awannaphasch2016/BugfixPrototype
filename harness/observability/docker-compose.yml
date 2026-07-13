@@ -1,0 +1,66 @@
+# The signaling layer's showpiece (M7): Grafana + Loki + Alloy, fully local.
+# Alloy tails the demo app's log file into Loki; Grafana renders the
+# "Signals — Tasks app" dashboard and fires the planted-signature alert whose
+# webhook POSTs to the chat backend's routing route on the host (port 4000).
+#
+# Ports: Grafana 3001 (3000 is the demo app), Loki 3100 (for verification
+# curls; Grafana and Alloy talk to it on the compose network).
+#
+# Images are pinned; harness/install.sh pre-pulls them at setup time so demo
+# day never downloads. Bring up/down via up.sh / down.sh in this directory.
+services:
+  loki:
+    image: grafana/loki:3.7.2
+    command: -config.file=/etc/loki/loki-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+
+  alloy:
+    image: grafana/alloy:v1.17.1
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # The monitored log: the repo's demo-app/logs, read-only, resolved
+      # relative to this compose file.
+      - ../../demo-app/logs:/var/log/demo-app:ro
+      # Tail positions persist here so a container restart never re-ingests
+      # the whole file (a re-ingest would replay old signature lines with
+      # fresh timestamps and could fire the alert spuriously).
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:13.1.0
+    ports:
+      - "3001:3000"
+    environment:
+      # Demo-friendly: no login dance on stage. Anonymous visitors get Admin
+      # (needed to view alert rules); admin/admin still works for the API.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Without this, links Grafana generates (e.g. the webhook body's
+      # generatorURL) point at its default localhost:3000 — the demo app.
+      GF_SERVER_ROOT_URL: http://localhost:3001/
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    extra_hosts:
+      # Lets the alert webhook reach the chat backend on the host:
+      # http://host.docker.internal:4000/api/signal
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - loki
+
+volumes:
+  loki-data:
+  alloy-data:

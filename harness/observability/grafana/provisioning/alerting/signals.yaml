@@ -1,0 +1,102 @@
+# Alerting provisioning for the signaling layer: one fast-evaluating rule on
+# the planted signature, one webhook contact point at the chat backend's
+# routing route, and a notification policy that routes ONLY this alert there.
+#
+# Timing knobs (latency kills the scene): the group evaluates every 10s, the
+# rule has no pending period (for: 0s), and the route's group_wait is 0s —
+# trigger step to webhook is one evaluation cycle, ~5–15s.
+#
+# Provisioned alerting objects are read-only in the Grafana UI; edit these
+# files and `docker compose restart grafana` (or POST
+# /api/admin/provisioning/alerting/reload as admin) to apply changes.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: signals
+    folder: Signals
+    interval: 10s
+    rules:
+      - uid: planted-signature-task-validation
+        title: Planted signature — task update failed validation
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              # Instant LogQL vector: how many signature lines in the last
+              # minute. Instant (not range) so the threshold node can consume
+              # it without a reduce step.
+              expr: 'sum(count_over_time({job="demo-app"} |= `task update failed validation` [1m]))'
+              queryType: instant
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: OK
+        for: 0s
+        annotations:
+          signature: task update failed validation
+        labels:
+          signal: task-validation
+
+contactPoints:
+  # Root receiver for everything that is NOT the planted-signature alert.
+  # Inert: no SMTP is configured, so nothing is ever delivered. It must be
+  # provisioned here because a file-provisioned policy tree cannot reference
+  # the built-in grafana-default-email receiver (provisioning runs before the
+  # default Alertmanager config exists — Grafana fails to boot).
+  - orgId: 1
+    name: signals-blackhole
+    receivers:
+      - uid: signals-blackhole
+        type: email
+        settings:
+          addresses: nobody@localhost
+  - orgId: 1
+    name: signal-webhook
+    receivers:
+      - uid: signal-webhook
+        type: webhook
+        # Firing notifications only: a resolved notification also carries
+        # alerts[0].annotations.signature, and the routing route would parse
+        # it as a fresh signal (verified live — the resolved POST arrived
+        # with the signature intact until this flag was set).
+        disableResolveMessage: true
+        settings:
+          # The chat backend's routing route on the host. The route reads
+          # alerts[0].annotations.signature from the standard Grafana webhook
+          # payload (harness/chat/app/api/signal/route.ts).
+          url: http://host.docker.internal:4000/api/signal
+          httpMethod: POST
+
+policies:
+  - orgId: 1
+    receiver: signals-blackhole
+    group_by: ["grafana_folder", "alertname"]
+    routes:
+      # ONLY the planted-signature rule (label signal=task-validation) goes
+      # to the webhook; everything else stays on the inert default receiver.
+      - receiver: signal-webhook
+        object_matchers:
+          - ["signal", "=", "task-validation"]
+        group_wait: 0s
+        group_interval: 30s
+        repeat_interval: 5m

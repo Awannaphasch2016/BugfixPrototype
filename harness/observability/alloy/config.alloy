@@ -1,0 +1,25 @@
+// Alloy (Promtail's successor — Promtail is EOL) tails the demo app's pino
+// log and ships it to Loki with the labels the dashboard and alert key on.
+//
+// tail_from_end = true: on first start (no stored position) begin at the end
+// of the file. The committed log already contains historical planted-
+// signature lines; ingesting them at boot would stamp them with "now" and
+// fire the alert — and its webhook — before anyone touched the app. Positions
+// persist in the alloy-data volume, so restarts resume exactly where they
+// left off and never re-read history either.
+
+loki.source.file "demo_app" {
+  targets = [{
+    __path__ = "/var/log/demo-app/app.log",
+    job      = "demo-app",
+    app      = "tasks",
+  }]
+  tail_from_end = true
+  forward_to    = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

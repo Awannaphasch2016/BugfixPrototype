@@ -53,3 +53,11 @@ APP_DIR="$(dirname "${BASH_SOURCE[0]}")/../demo-app"
   echo "@playwright/mcp npx cache warm"
 (cd "$APP_DIR" && npx --yes @playwright/mcp@latest install-browser chromium chrome-for-testing >/dev/null 2>&1) &&
   echo "Playwright MCP chromium browser installed"
+
+# Signaling layer (M7): pre-pull the pinned Grafana/Loki/Alloy images for the
+# harness/observability compose stack, so demo day never downloads. Idempotent:
+# `docker compose pull` no-ops when the pinned tags are already local. See the
+# grafana-loki-local skill for the stack's layout and verification recipe.
+OBS_COMPOSE="$(dirname "${BASH_SOURCE[0]}")/observability/docker-compose.yml"
+docker compose -f "$OBS_COMPOSE" pull --quiet
+echo "observability images pre-pulled (grafana, loki, alloy)"
