@@ -136,7 +136,8 @@ describe("POST /api/signal", () => {
     // The shared dispatch core (restore, runner), then the setup.sh flow:
     // merge, sync the checkout, mark the lane on the record.
     expect(commands.slice(6)).toEqual([
-      "git checkout HEAD -- demo-app/data/tasks.json demo-app/logs/app.log",
+      "git show HEAD:demo-app/data/tasks.json",
+      "git show HEAD:demo-app/logs/app.log",
       "runner 42",
       "gh pr merge 7 --merge --delete-branch",
       "git checkout main",

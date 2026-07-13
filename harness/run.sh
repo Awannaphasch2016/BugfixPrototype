@@ -41,6 +41,16 @@ abort() {
   exit 1
 }
 
+# Restore the runtime-dirtied files IN PLACE (truncate + rewrite), never via
+# git checkout: the dev server's logger holds an fd to the log's inode, and a
+# checkout swaps the inode — every later log line would land in an orphaned
+# file and the signaling layer would tail a dead path (found live in the
+# Stage 4 walkthrough rehearsal, 2026-07-13).
+restore_runtime_files() {
+  git show "HEAD:$APP_DIR/data/tasks.json" > "$APP_DIR/data/tasks.json"
+  git show "HEAD:$APP_DIR/logs/app.log" > "$APP_DIR/logs/app.log"
+}
+
 [[ -z "$(git status --porcelain)" ]] || {
   echo "ERROR: working tree not clean — commit, stash, or reset first" >&2
   exit 1
@@ -217,7 +227,7 @@ fi
 # The agent's test runs append to the runtime files (tests isolate TASKS_FILE
 # but the logger writes to the real logs/app.log). That's run exhaust, never
 # part of a fix — restore both so it can't ride into the PR.
-git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
+restore_runtime_files
 
 git add -A
 CHANGED=$(git diff --cached --name-only)
@@ -251,15 +261,17 @@ if [[ -n "$CHANGED_TESTS" && -n "$NON_TEST_CHANGED" ]]; then
   # shellcheck disable=SC2086
   git checkout -q main -- $NON_TEST_CHANGED
   if BASELINE_OUT=$(cd "$APP_DIR" && npm test 2>&1); then
-    git checkout -q "$BRANCH" -- .
+    # shellcheck disable=SC2086
+    git checkout -q "$BRANCH" -- $NON_TEST_CHANGED
     abort "gate failed: regression test is green on baseline code — it proves nothing"
   fi
   RED_COUNT_LINE=$(echo "$BASELINE_OUT" | grep -E '^[[:space:]]*Tests[[:space:]]' | head -1 | xargs)
-  git checkout -q "$BRANCH" -- .
+  # shellcheck disable=SC2086
+  git checkout -q "$BRANCH" -- $NON_TEST_CHANGED
   RED_LINE="red on baseline ($RED_COUNT_LINE) → green with fix ($TESTS_GREEN_LINE)"
 fi
 # test runs dirty the runtime files; the branch's versions are the clean ones
-git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
+restore_runtime_files
 echo "==> [gates] green — $TESTS_GREEN_LINE; lint clean; regression: $RED_LINE"
 
 git push -q -u origin "$BRANCH"
@@ -346,7 +358,8 @@ EOF
   tester_phase "reproduce the reported symptom on the CURRENT build (it should be present)" \
     "Derive the user-visible symptom from the report, drive the app until it is visible, and capture it in screenshot(s) named before-<aspect>.png. If you cannot make the symptom appear, say so plainly — do not fake it." \
     "$TESTER_BEFORE_JSON" || TESTER_OK=0
-  git checkout -q "$BRANCH" -- .
+  # shellcheck disable=SC2086
+  git checkout -q "$BRANCH" -- $FIX_FILES
 
   TESTER_AFTER_JSON="harness/private/tester-after-issue-$ISSUE.json"
   if (( TESTER_OK )); then
@@ -355,8 +368,9 @@ EOF
       "Repeat the same steps that showed the symptom and capture the healthy behavior in screenshot(s) named after-<aspect>.png. State plainly whether the symptom is gone." \
       "$TESTER_AFTER_JSON" || TESTER_OK=0
   fi
-  git checkout -q "$BRANCH" -- .
-  git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
+  # shellcheck disable=SC2086
+  git checkout -q "$BRANCH" -- $FIX_FILES
+  restore_runtime_files
   TESTER_SECS=$((SECONDS - STAGE_T0))
 
   if (( TESTER_OK )) &&
@@ -467,7 +481,7 @@ fi
 
 # The reviewer's test runs dirty the runtime files exactly like the fixer's
 # did — restore them so a bare run.sh finds a clean tree next time.
-git checkout -q -- "$APP_DIR/data/tasks.json" "$APP_DIR/logs/app.log"
+restore_runtime_files
 
 # Stage wall clocks feed the narration schedule (what the operator shows
 # during each wait).
