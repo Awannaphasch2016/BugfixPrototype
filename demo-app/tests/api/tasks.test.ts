@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp } from "fs/promises";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import { GET, POST } from "@/app/api/tasks/route";
@@ -86,6 +86,37 @@ describe("PATCH /api/tasks/:id", () => {
     const list = await (await listTasks()).json();
     expect(list.tasks).toHaveLength(1);
     expect(list.tasks[0].title).toBe("Plan offsite");
+  });
+
+  it("logs an over-long-title rejection at warn, not error", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "tasks-log-"));
+    const logFile = path.join(dir, "app.log");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("LOG_FILE", logFile);
+    vi.resetModules();
+    try {
+      const { POST: post } = await import("@/app/api/tasks/route");
+      const { PATCH: patch } = await import("@/app/api/tasks/[id]/route");
+
+      const { task } = await (
+        await post(jsonRequest("http://localhost/api/tasks", "POST", { title: "Plan offsite" }))
+      ).json();
+      const res = await patch(
+        jsonRequest(`http://localhost/api/tasks/${task.id}`, "PATCH", { title: "x".repeat(101) }),
+        { params: Promise.resolve({ id: task.id }) }
+      );
+      expect(res.status).toBe(400);
+
+      const lines = (await readFile(logFile, "utf8"))
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l));
+      const rejection = lines.find((l) => l.msg === "task update failed validation");
+      expect(rejection).toBeDefined();
+      expect(rejection.level).toBe(40);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("404s for an unknown task id", async () => {
