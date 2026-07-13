@@ -21,6 +21,7 @@ import {
   codePointSpansToUtf16,
   composeContextReport,
   parseLogLines,
+  parseRedactionSpans,
   selectExcerpt,
   type RedactionSpan,
 } from "../lib/context-report";
@@ -57,22 +58,6 @@ function redact(text: string): Promise<string> {
   });
 }
 
-function parseSpans(json: string): RedactionSpan[] {
-  const parsed: unknown = JSON.parse(json);
-  if (!Array.isArray(parsed)) throw new Error("spans output is not a JSON array");
-  return parsed.map((s: unknown) => {
-    const span = s as { start?: unknown; end?: unknown; entity?: unknown };
-    if (
-      typeof span.start !== "number" ||
-      typeof span.end !== "number" ||
-      typeof span.entity !== "string"
-    ) {
-      throw new Error("span missing start/end/entity");
-    }
-    return { start: span.start, end: span.end, entity: span.entity };
-  });
-}
-
 async function main() {
   const logPath = arg("--log");
   const signature = arg("--signature");
@@ -91,7 +76,7 @@ async function main() {
 
   let spans: RedactionSpan[];
   try {
-    spans = parseSpans(await redact(canonical));
+    spans = parseRedactionSpans(await redact(canonical));
   } catch (err) {
     // The fail-safe: bad or failing redaction means no report at all.
     fail(`redaction failed, refusing to emit an unredacted report — ${(err as Error).message}`);

@@ -36,12 +36,25 @@ const CLOSED_ISSUES = [
 ];
 
 // The stub answers out of demo order; the route must sort ascending so the
-// cards on screen match the filing (and demo) choreography.
+// cards on screen match the filing (and demo) choreography. Labels arrive in
+// gh's object shape and leave as plain names for the card badges.
 const OPEN_ISSUES = [
-  { number: 8, title: "Some tasks disappear after being marked done", url: `${REPO}/issues/8` },
-  { number: 6, title: "Done tab shows the wrong tasks", url: `${REPO}/issues/6` },
-  { number: 7, title: "Due dates keep disappearing", url: `${REPO}/issues/7` },
+  {
+    number: 8,
+    title: "Some tasks disappear after being marked done",
+    url: `${REPO}/issues/8`,
+    labels: [{ name: "class:task-update-failed-validation" }, { name: "needs-human" }],
+  },
+  { number: 6, title: "Done tab shows the wrong tasks", url: `${REPO}/issues/6`, labels: [] },
+  { number: 7, title: "Due dates keep disappearing", url: `${REPO}/issues/7`, labels: [] },
 ];
+
+const asCard = ({ number, title, url, labels }: (typeof OPEN_ISSUES)[number]) => ({
+  number,
+  title,
+  url,
+  labels: labels.map((label) => label.name),
+});
 
 const ISSUE_4 = { number: 4, title: "Done tab shows the wrong tasks", url: `${REPO}/issues/4` };
 const ISSUE_5 = { number: 5, title: "Due dates keep disappearing", url: `${REPO}/issues/5` };
@@ -57,7 +70,7 @@ beforeEach(async () => {
     `case "$*" in
   "pr list --state merged --limit 500 --json number,title,url,headRefName") cat "${stubDir()}/merged-prs.json" ;;
   "issue list --state closed --limit 500 --json number,title,url,stateReason,labels") cat "${stubDir()}/closed-issues.json" ;;
-  "issue list --state open --json number,title,url") cat "${stubDir()}/open-issues.json" ;;
+  "issue list --state open --json number,title,url,labels") cat "${stubDir()}/open-issues.json" ;;
   *) echo "gh stub: unexpected args: $*" >&2; exit 1 ;;
 esac`,
   );
@@ -67,14 +80,14 @@ esac`,
 });
 
 describe("GET /api/issues", () => {
-  it("maps open issues to cards, sorted ascending by number", async () => {
+  it("maps open issues to cards with label names, sorted ascending by number", async () => {
     const res = await listIssues();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      issues: [OPEN_ISSUES[1], OPEN_ISSUES[2], OPEN_ISSUES[0]],
+      issues: [asCard(OPEN_ISSUES[1]), asCard(OPEN_ISSUES[2]), asCard(OPEN_ISSUES[0])],
     });
     expect(await spawnedCommands()).toEqual([
-      "gh issue list --state open --json number,title,url",
+      "gh issue list --state open --json number,title,url,labels",
     ]);
   });
 

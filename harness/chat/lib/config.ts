@@ -23,3 +23,9 @@ export function gitCmd(): string {
 export function redactCmd(): string {
   return process.env.CHAT_REDACT_CMD ?? path.join(repoRoot(), "harness", "redact.py");
 }
+
+export function signalLogFile(): string {
+  return (
+    process.env.SIGNAL_LOG_FILE ?? path.join(repoRoot(), "demo-app", "logs", "app.log")
+  );
+}

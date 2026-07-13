@@ -39,8 +39,21 @@ PR=$(gh pr list --state open --head "fix/issue-$ISSUE" --json number -q '.[0].nu
 
 gh pr merge "$PR" --merge --delete-branch
 gh issue edit "$ISSUE" --add-label "$LABEL"
+
+# Seed the precedent ledger (ADR-0002): bug 1's honest problem class. With
+# the class label on a completed issue that has a merged fix-branch PR, the
+# opening state shows earned precedent — the next signal of this class routes
+# to the autofix lane with no human at entry. Labels are repo-level state no
+# reset touches; create idempotently, same as the lane marker above.
+CLASS_LABEL="class:list-filter"
+if ! gh label list --limit 200 --json name -q '.[].name' | grep -qxF "$CLASS_LABEL"; then
+  gh label create "$CLASS_LABEL" --color "1d76db" \
+    --description "problem class — precedent ledger"
+fi
+gh issue edit "$ISSUE" --add-label "$CLASS_LABEL"
+
 git checkout -q main
 git pull -q --ff-only origin main
 
 echo "==> setup complete: issue #$ISSUE ('$TITLE') autofixed and merged (PR #$PR)"
-echo "==> demo inventory: bug 1 closed+labeled, bugs 2/3 open, no open PRs"
+echo "==> demo inventory: bug 1 closed+labeled ($LABEL, $CLASS_LABEL), bugs 2/3 open, no open PRs"

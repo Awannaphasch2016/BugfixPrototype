@@ -22,9 +22,12 @@ export async function freshStubEnv() {
 
 export async function writeStub(name: string, body = "") {
   const stubPath = path.join(dir, name);
+  // Newlines inside arguments (e.g. multi-line issue bodies) are escaped to
+  // literal \n so every spawned command stays exactly one log line, and a
+  // zero-argument spawn logs the bare command name with no trailing space.
   await writeFile(
     stubPath,
-    `#!/usr/bin/env bash\necho "${name} $*" >> "${logFile}"\n${body}\n`,
+    `#!/usr/bin/env bash\nargs="$*"\nargs="\${args//$'\\n'/\\\\n}"\necho "${name}\${args:+ \${args}}" >> "${logFile}"\n${body}\n`,
     { mode: 0o755 },
   );
   return stubPath;

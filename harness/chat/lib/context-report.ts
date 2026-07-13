@@ -128,6 +128,26 @@ export function canonicalizePaths(text: string, repoRoots: string[] = []): strin
 }
 
 /**
+ * Parse and validate the redaction command's stdout (a JSON array of spans).
+ * Throws on anything malformed — callers turn that into the fail-safe path.
+ */
+export function parseRedactionSpans(json: string): RedactionSpan[] {
+  const parsed: unknown = JSON.parse(json);
+  if (!Array.isArray(parsed)) throw new Error("spans output is not a JSON array");
+  return parsed.map((s: unknown) => {
+    const span = s as { start?: unknown; end?: unknown; entity?: unknown };
+    if (
+      typeof span.start !== "number" ||
+      typeof span.end !== "number" ||
+      typeof span.entity !== "string"
+    ) {
+      throw new Error("span missing start/end/entity");
+    }
+    return { start: span.start, end: span.end, entity: span.entity };
+  });
+}
+
+/**
  * Convert spans given as Unicode code point offsets (what Python's Presidio
  * reports) into JS string (UTF-16 code unit) offsets, so slicing in JS lands
  * on the same characters. Identity on plain ASCII.

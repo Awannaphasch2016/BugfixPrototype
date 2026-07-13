@@ -17,7 +17,11 @@ export type Badge = "autofixed" | "human-approved";
 export type SolvedEntry = { issue: IssueRef; pr: PrRef; badge: Badge };
 
 const FIX_BRANCH = /^fix\/issue-(\d+)$/;
-const LANE_LABEL = "autofixed";
+// The lane marker (CONTEXT.md): applied by the pipeline at the moment it
+// merges without review — setup.sh's seeding and the signal route's
+// auto-dispatch are the two places that moment happens.
+export const AUTOFIXED_LABEL = "autofixed";
+const LANE_LABEL = AUTOFIXED_LABEL;
 
 // Two axes, two mechanisms: lifecycle is GitHub's native issue state (only
 // "closed as completed" counts as solved — retired rehearsal issues are
@@ -27,6 +31,26 @@ const LANE_LABEL = "autofixed";
 // merged PR as the clickable receipt, so completed issues without a merged
 // fix-branch PR don't appear.
 export async function solvedEntries(): Promise<SolvedEntry[]> {
+  return (await solvedRecords()).map(({ issue, pr }) => ({
+    issue: { number: issue.number, title: issue.title, url: issue.url },
+    pr,
+    badge: issue.labels.some((label) => label.name === LANE_LABEL)
+      ? "autofixed"
+      : "human-approved",
+  }));
+}
+
+// The precedent ledger read (ADR-0002): a problem class has precedent when a
+// closed-as-completed issue carrying its label has a merged fix-branch PR —
+// exactly a solved record whose issue wears the label. Labels ride the solved
+// queries; no other store exists to consult.
+export async function hasPrecedent(classLabel: string): Promise<boolean> {
+  return (await solvedRecords()).some(({ issue }) =>
+    issue.labels.some((label) => label.name === classLabel),
+  );
+}
+
+async function solvedRecords(): Promise<{ issue: GhIssue; pr: PrRef }[]> {
   // Nothing is ever deleted, so closed issues and merged PRs accumulate a few
   // per cycle forever — gh's default cap of 30 would silently truncate the
   // record an auditor browses.
@@ -62,13 +86,5 @@ export async function solvedEntries(): Promise<SolvedEntry[]> {
     });
   }
 
-  return [...latestPerIssue.values()]
-    .sort((a, b) => a.issue.number - b.issue.number)
-    .map(({ issue, pr }) => ({
-      issue: { number: issue.number, title: issue.title, url: issue.url },
-      pr,
-      badge: issue.labels.some((label) => label.name === LANE_LABEL)
-        ? "autofixed"
-        : "human-approved",
-    }));
+  return [...latestPerIssue.values()].sort((a, b) => a.issue.number - b.issue.number);
 }

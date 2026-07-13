@@ -52,6 +52,18 @@
   color: #0969da;
 }
 
+/* Routing labels on open-issue cards: the problem class (precedent ledger)
+   and the needs-human escalation marker. */
+.badge-class {
+  background: #ddf4ff;
+  color: #1d76db;
+}
+
+.badge-needs-human {
+  background: #fff1e5;
+  color: #bc4c00;
+}
+
 .card-status {
   font-size: 0.85em;
   color: #57606a;

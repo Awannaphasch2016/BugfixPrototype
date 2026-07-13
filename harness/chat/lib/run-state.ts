@@ -24,6 +24,13 @@ export function releaseRunLock(): void {
   state.__chatRunInFlight = false;
 }
 
+// A peek, not a claim: the signal route answers its webhook immediately, so
+// it needs to know whether an auto-dispatch would be skipped without holding
+// the lock across the response.
+export function runInFlight(): boolean {
+  return state.__chatRunInFlight === true;
+}
+
 // The last dispatch's outcome outlives its HTTP request on purpose: if a
 // proxy between the browser and this backend kills the blocking request,
 // the run keeps going here, and the client recovers the result from this.

@@ -11,7 +11,9 @@ import {
   TypingIndicator,
 } from "@chatscope/chat-ui-kit-react";
 
-type Issue = { number: number; title: string; url: string };
+// labels is optional: only /api/issues sends it (the routing verdict on the
+// card); solved/autofixed entries carry their lane as the badge instead.
+type Issue = { number: number; title: string; url: string; labels?: string[] };
 type PrRef = { number: number; title?: string; url: string };
 type AutofixedEntry = { issue: Issue; pr: PrRef };
 // The two lanes, as recorded on GitHub: the `autofixed` label present or not.
@@ -250,6 +252,27 @@ export default function Home() {
     );
   }
 
+  // The routing verdict, worn on the card: the problem-class label (the
+  // precedent ledger's unit) and needs-human when the class is novel. Other
+  // labels stay off the chat — GitHub renders the full record.
+  function RoutingBadges({ labels }: { labels?: string[] }) {
+    const routing = (labels ?? []).filter(
+      (label) => label.startsWith("class:") || label === "needs-human",
+    );
+    return (
+      <>
+        {routing.map((label) => (
+          <span
+            key={label}
+            className={`badge ${label === "needs-human" ? "badge-needs-human" : "badge-class"}`}
+          >
+            {label}
+          </span>
+        ))}
+      </>
+    );
+  }
+
   function renderContent(msg: ChatMessage) {
     switch (msg.kind) {
       case "user":
@@ -312,6 +335,7 @@ export default function Home() {
               <div className="card" key={issue.number}>
                 <div className="card-title">
                   #{issue.number} {issue.title}
+                  <RoutingBadges labels={issue.labels} />
                 </div>
                 <div className="card-links">
                   <a href={issue.url} target="_blank" rel="noreferrer">
