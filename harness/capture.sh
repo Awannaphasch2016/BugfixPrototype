@@ -61,10 +61,15 @@ PR=$(gh pr list --state merged --limit 500 --json number,headRefName \
 git fetch -q origin "refs/pull/$PR/head"
 HEAD_SHA=$(git rev-parse FETCH_HEAD)
 
-# The fixer's work is the PR's FIRST commit (a later commit, when present, is
-# the runner-committed tester evidence), and it is single-parent, so its own
-# diff is the fix — independent of whatever else was on main in its cycle.
-FIX_SHA=$(gh pr view "$PR" --json commits --jq '.commits[0].oid')
+# The fixer's work is the PR commit the runner titled "Fix #<issue>: ..." (a
+# later commit, when present, is the runner-committed tester evidence; an
+# earlier one can be mainline history the branch carried when local main ran
+# ahead of origin). It is single-parent, so its own diff is the fix —
+# independent of whatever else was on main in its cycle.
+FIX_SHA=$(gh pr view "$PR" --json commits \
+  --jq ".commits[] | select(.messageHeadline | startswith(\"Fix #$ISSUE:\")) | .oid" | head -n1)
+[[ -n "$FIX_SHA" ]] ||
+  { echo "ERROR: PR #$PR has no commit titled 'Fix #$ISSUE:'" >&2; exit 1; }
 [[ $(git show -s --format=%P "$FIX_SHA" | wc -w) -eq 1 ]] ||
   { echo "ERROR: PR #$PR first commit $FIX_SHA is not a single-parent fixer commit" >&2; exit 1; }
 

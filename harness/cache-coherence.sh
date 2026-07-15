@@ -152,4 +152,7 @@ if (( FAILED )); then
   echo "ERROR: coherence lint failed for $ENTRY — recapture from a clean source; never hand-edit the cache" >&2
   exit 1
 fi
-echo "==> coherence: $ENTRY clean (own issue #$ISSUE → {{issue}}${PRECEDENT:+, precedent #$PRECEDENT → {{precedent}}}${FIRING_REQID:+, firing $FIRING_REQID → {{fresh_reqid}}})"
+SUMMARY="own issue #$ISSUE → {{issue}}"
+[[ -z "$PRECEDENT" ]] || SUMMARY+=", precedent #$PRECEDENT → {{precedent}}"
+[[ -z "$FIRING_REQID" ]] || SUMMARY+=", firing $FIRING_REQID → {{fresh_reqid}}"
+echo "==> coherence: $ENTRY clean ($SUMMARY)"
