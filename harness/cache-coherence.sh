@@ -23,15 +23,16 @@ ISSUE="${2:?usage: harness/cache-coherence.sh <cache-entry-dir> <own-issue-numbe
 PROSE_MD=(plan.md review.md evidence/evidence.md)
 
 # Own-issue references, in every shape the artifacts use them: "#N",
-# "issue N", "Issue N", "issue-N" (evidence paths). Nothing else is touched.
+# "issue N", "Issue N", "issue-N" (evidence paths), and the URL form
+# ".../issues/N". Nothing else is touched.
 normalize() {
-  sed -E "s/#$ISSUE\b/#{{issue}}/g; s/\b([Ii]ssue[ -])$ISSUE\b/\1{{issue}}/g"
+  sed -E "s/#$ISSUE\b/#{{issue}}/g; s/\b([Ii]ssue[ -])$ISSUE\b/\1{{issue}}/g; s#(/issues/)$ISSUE\b#\1{{issue}}#g"
 }
 
 FAILED=0
-check() { # <artifact-label> <file> <regex> <what>
+check() { # <artifact-label> <file> <perl-regex> <what>
   local hits
-  hits=$(grep -nE "$3" "$2" || true)
+  hits=$(grep -nP "$3" "$2" || true)
   [[ -n "$hits" ]] || return 0
   FAILED=1
   while IFS= read -r hit; do
@@ -39,8 +40,12 @@ check() { # <artifact-label> <file> <regex> <what>
   done <<<"$hits"
 }
 
+# The issue-number pattern's lookahead spares hex colors ("#22c55e" is not an
+# issue reference); an all-digit token like "#123" still fails strict — a
+# recapture costs minutes, a stale number on stage costs the pitch. The URL
+# alternates catch tracker references the prose forms miss.
 lint() { # <artifact-label> <file>
-  check "$1" "$2" '#[0-9]+|\b[Ii]ssue[ -]#?[0-9]+' "issue number (foreign — the own number is already {{issue}})"
+  check "$1" "$2" '#[0-9]+(?![0-9a-fA-F])|\b[Ii]ssue[ -]#?[0-9]+|/(issues|pull)/[0-9]+' "issue number (foreign — the own number is already {{issue}})"
   check "$1" "$2" '\b[0-9a-f]{7,40}\b' "commit sha (or sha-shaped token)"
   check "$1" "$2" '\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b|\b[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}\b' "date"
 }

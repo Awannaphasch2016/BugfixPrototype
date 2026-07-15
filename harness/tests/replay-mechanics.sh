@@ -4,16 +4,20 @@
 # gh/npm/sleep stubbed, claude poisoned). Asserts:
 #
 #   1. coherence (harness/cache-coherence.sh): a dirty artifact — foreign
-#      issue number, commit sha, or date — fails with a message naming the
-#      offending line; a clean artifact's own issue number is normalized to
-#      the {{issue}} placeholder, in .md prose and in result.json's .result;
+#      issue number (prose or URL form), commit sha, or date — fails with a
+#      message naming the offending line; a clean artifact's own issue
+#      number (prose and URL forms) is normalized to the {{issue}}
+#      placeholder, in .md prose and in result.json's .result, and hex
+#      colors pass;
 #   2. replay of a first attempt posts every cached artifact with the fresh
 #      issue number substituted into the placeholder, applies the cached
 #      patch, and never invokes an agent;
 #   3. replay of a follow-up attempt (--attempt 2) applies on top of the
 #      first fix's merged state;
 #   4. beats are separated by the configured DEMO_REPLAY_DELAY; unset means
-#      no sleeps at all.
+#      no sleeps at all;
+#   5. setup.sh's pre-run obeys the one switch: --replay with DEMO_REPLAY
+#      set, live without it.
 #
 # No network, no GitHub, no real agent. Exits 0 green, 1 with the first
 # failed assertion.
@@ -34,7 +38,7 @@ COHERENCE="$REPO_ROOT/harness/cache-coherence.sh"
 
 DIRTY="$TMP/dirty-entry"
 mkdir -p "$DIRTY"
-printf '## Plan — planner agent\n\nSee the earlier fix in #12 for context.\n' > "$DIRTY/plan.md"
+printf '## Plan — planner agent\n\nSee the earlier fix in #12 for context.\n\nAlso https://github.com/acme/demo/pull/34 discusses it.\n' > "$DIRTY/plan.md"
 printf '## Review — reviewer agent\n\nMatches commit 3abe4e0dead in spirit.\n' > "$DIRTY/review.md"
 jq -n '{is_error:false, result:"## Diagnosis\n\nBroken since 2026-07-12."}' > "$DIRTY/result.json"
 if "$COHERENCE" "$DIRTY" 7 > "$OUT/coherence-dirty.log" 2>&1; then
@@ -42,6 +46,8 @@ if "$COHERENCE" "$DIRTY" 7 > "$OUT/coherence-dirty.log" 2>&1; then
 fi
 grep -q "issue number.*plan.md line 3" "$OUT/coherence-dirty.log" ||
   fail "coherence did not name the foreign issue number's file and line"
+grep -q "issue number.*plan.md line 5" "$OUT/coherence-dirty.log" ||
+  fail "coherence did not catch the URL-form tracker reference"
 grep -q "commit sha.*review.md line 3" "$OUT/coherence-dirty.log" ||
   fail "coherence did not name the sha's file and line"
 grep -q "date.*result.json:.result line 3" "$OUT/coherence-dirty.log" ||
@@ -49,13 +55,15 @@ grep -q "date.*result.json:.result line 3" "$OUT/coherence-dirty.log" ||
 
 CLEAN="$TMP/clean-entry"
 mkdir -p "$CLEAN/evidence"
-printf '## Plan — planner agent\n\nRoot cause of issue 7, reported as #7.\n' > "$CLEAN/plan.md"
+printf '## Plan — planner agent\n\nRoot cause of issue 7, reported as #7.\n\nFiled as https://github.com/acme/demo/issues/7; the accent is #22c55e.\n' > "$CLEAN/plan.md"
 printf '### Symptom\n\nShots for issue-7 attached.\n' > "$CLEAN/evidence/evidence.md"
 jq -n '{is_error:false, result:"## Diagnosis\n\nThe defect behind issue #7."}' > "$CLEAN/result.json"
 "$COHERENCE" "$CLEAN" 7 > "$OUT/coherence-clean.log" 2>&1 ||
-  { cat "$OUT/coherence-clean.log" >&2; fail "coherence rejected a clean entry"; }
+  { cat "$OUT/coherence-clean.log" >&2; fail "coherence rejected a clean entry (own refs + hex color must pass)"; }
 grep -q 'issue {{issue}}, reported as #{{issue}}' "$CLEAN/plan.md" ||
   fail "own issue number not normalized in plan.md"
+grep -q 'issues/{{issue}}; the accent is #22c55e' "$CLEAN/plan.md" ||
+  fail "own issue URL not normalized (or the hex color was mangled)"
 grep -q 'issue-{{issue}}' "$CLEAN/evidence/evidence.md" ||
   fail "own issue-N reference not normalized in evidence.md"
 [[ "$(jq -r '.result' "$CLEAN/result.json")" == $'## Diagnosis\n\nThe defect behind issue #{{issue}}.' ]] ||
@@ -104,6 +112,14 @@ case "$1 $2" in
     body_to "$STUB_OUT/pr-comment-$N.txt" "$@" ;;
   "pr edit")
     body_to "$STUB_OUT/pr-edit-body.txt" "$@" ;;
+  "issue list")
+    echo '[{"number":7,"title":"Stub bug title"}]' ;;
+  "label list")
+    printf 'autofixed\nclass:list-filter\n' ;;
+  "pr list")
+    echo "99" ;;
+  "pr merge") : ;;
+  "issue edit") : ;;
   *) echo "gh stub: unexpected args: $*" >&2; exit 1 ;;
 esac
 STUB
@@ -228,5 +244,30 @@ cmp -s "$OUT/expected-plan-2.txt" "$OUT/issue-comment-1.txt" ||
 [[ -f "$OUT/sleep.log" ]] || fail "DEMO_REPLAY_DELAY=9 never slept between beats"
 [[ "$(cat "$OUT/sleep.log")" == $'9\n9\n9' ]] ||
   { cat "$OUT/sleep.log" >&2; fail "expected exactly three sleeps of 9s between four beats"; }
+
+# ---- 4. setup.sh obeys the one switch --------------------------------------
+# The runner is swapped for a logging stub: the assertion is exactly which
+# argv setup's pre-run composes under each switch state, nothing more.
+cp "$REPO_ROOT/harness/setup.sh" "$TMP/repo/harness/setup.sh"
+mkdir -p "$TMP/repo/harness/private/issues"
+printf 'Stub bug title\n\nStub bug body line.\n' > "$TMP/repo/harness/private/issues/bug-1.md"
+cat > "$TMP/repo/harness/run.sh" <<'STUB'
+#!/usr/bin/env bash
+echo "run.sh $*" >> "$STUB_OUT/runner.log"
+echo "==> PR ready for review: https://github.com/stub/stub/pull/99"
+STUB
+chmod +x "$TMP/repo/harness/run.sh"
+
+( cd "$TMP/repo" && PATH="$TMP/bin:$PATH" STUB_OUT="$OUT" DEMO_REPLAY=1 \
+    bash harness/setup.sh ) > "$OUT/setup-replay.log" 2>&1 ||
+  { cat "$OUT/setup-replay.log" >&2; fail "setup.sh exited non-zero with the switch on"; }
+grep -qx "run.sh --replay 7" "$OUT/runner.log" ||
+  fail "setup with the switch on did not replay the pre-run"
+
+( cd "$TMP/repo" && PATH="$TMP/bin:$PATH" STUB_OUT="$OUT" \
+    bash harness/setup.sh ) > "$OUT/setup-live.log" 2>&1 ||
+  { cat "$OUT/setup-live.log" >&2; fail "setup.sh exited non-zero with the switch off"; }
+grep -qx "run.sh 7" "$OUT/runner.log" ||
+  fail "setup with the switch off did not run live (leg 1's capture path)"
 
 echo "replay-mechanics: all assertions green"

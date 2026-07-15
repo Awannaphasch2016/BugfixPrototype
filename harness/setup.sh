@@ -25,8 +25,11 @@ ISSUE=$(gh issue list --state open --json number,title |
   { echo "ERROR: no open issue titled '$TITLE' — run harness/reset.sh first" >&2; exit 1; }
 
 # The label is repo-level state no reset touches: create it if absent so
-# applying it below can't fail on a fresh or hand-cleaned repo.
-if ! gh label list --json name -q '.[].name' | grep -qxF "$LABEL"; then
+# applying it below can't fail on a fresh or hand-cleaned repo. (Capture
+# before grepping: under pipefail, grep -q quitting at the first match can
+# SIGPIPE the producer and fail the pipeline spuriously.)
+LABEL_NAMES=$(gh label list --json name -q '.[].name')
+if ! grep -qxF "$LABEL" <<<"$LABEL_NAMES"; then
   gh label create "$LABEL" --color "1a7f37" \
     --description "Solved with no human in the loop — applied by the pipeline at auto-merge"
 fi
@@ -55,7 +58,8 @@ gh issue edit "$ISSUE" --add-label "$LABEL"
 # to the autofix lane with no human at entry. Labels are repo-level state no
 # reset touches; create idempotently, same as the lane marker above.
 CLASS_LABEL="class:list-filter"
-if ! gh label list --limit 200 --json name -q '.[].name' | grep -qxF "$CLASS_LABEL"; then
+LABEL_NAMES=$(gh label list --limit 200 --json name -q '.[].name')
+if ! grep -qxF "$CLASS_LABEL" <<<"$LABEL_NAMES"; then
   gh label create "$CLASS_LABEL" --color "1d76db" \
     --description "problem class — precedent ledger"
 fi

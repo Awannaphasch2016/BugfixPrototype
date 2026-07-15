@@ -121,7 +121,21 @@ case "$*" in
   *) echo "npm stub: unexpected args: $*" >&2; exit 1 ;;
 esac
 STUB
-chmod +x "$TMP/bin/claude" "$TMP/bin/gh" "$TMP/bin/npm"
+# ---- stub sleep: catches any pacing leak into live runs --------------------
+# DEMO_REPLAY_DELAY is exported for the whole live run below; a live run must
+# never sleep, whatever the knob says (stage-4b).
+cat > "$TMP/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >> "$STUB_OUT/sleep.log"
+STUB
+# ---- stub sleep: catches any pacing leak into live runs --------------------
+# DEMO_REPLAY_DELAY is exported for the whole main run below; a live run must
+# never sleep, whatever the knob says (stage-4b).
+cat > "$TMP/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >> "$STUB_OUT/sleep.log"
+STUB
+chmod +x "$TMP/bin/claude" "$TMP/bin/gh" "$TMP/bin/npm" "$TMP/bin/sleep" "$TMP/bin/sleep"
 
 # ---- throwaway world: bare origin + clone ----------------------------------
 git clone -q --bare "$REPO_ROOT" "$TMP/origin.git"
@@ -141,11 +155,13 @@ fail() { echo "FAIL: $1" >&2; exit 1; }
 # TESTER_APP_URL points at a dead port: the tester stage must skip cleanly
 # when no app is running (and must never spawn a browser in this test).
 ( cd "$TMP/repo" && PATH="$TMP/bin:$PATH" STUB_OUT="$OUT" \
-    TESTER_APP_URL="http://127.0.0.1:9" \
+    TESTER_APP_URL="http://127.0.0.1:9" DEMO_REPLAY_DELAY=7 \
     bash harness/run.sh 7 "$NOTE_TEXT" ) > "$OUT/run.log" 2>&1 ||
   { cat "$OUT/run.log" >&2; fail "run.sh exited non-zero"; }
 grep -q "tester stage skipped" "$OUT/run.log" ||
   fail "tester stage should skip when the app is unreachable"
+[[ ! -f "$OUT/sleep.log" ]] ||
+  fail "live run slept — the replay pacing knob must not touch live behavior"
 
 # 1. plan comment: attributed header + byte-identical plan, posted pre-commit
 [[ "$(cat "$OUT/issue-comments")" == "1" ]] || fail "expected exactly one issue comment"

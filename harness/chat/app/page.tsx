@@ -73,10 +73,23 @@ export default function Home() {
   const [replayMode, setReplayMode] = useState(false);
 
   useEffect(() => {
-    fetch("/api/config")
-      .then((res) => res.json())
-      .then((cfg: { replay?: boolean }) => setReplayMode(Boolean(cfg.replay)))
-      .catch(() => {});
+    let cancelled = false;
+    // The banner is the honesty device: a fetch that loses a race with the
+    // server's startup must retry, never silently leave replay unannounced.
+    const learnMode = () => {
+      fetch("/api/config")
+        .then((res) => res.json())
+        .then((cfg: { replay?: boolean }) => {
+          if (!cancelled) setReplayMode(Boolean(cfg.replay));
+        })
+        .catch(() => {
+          if (!cancelled) setTimeout(learnMode, 3000);
+        });
+    };
+    learnMode();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function add(msg: DistributiveOmit<ChatMessage, "id">) {

@@ -40,6 +40,8 @@ while [[ "${1-}" == --* ]]; do
     *) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
   esac
 done
+[[ "$ATTEMPT" =~ ^[0-9]+$ ]] ||
+  { echo "ERROR: --attempt must be a number, got: $ATTEMPT" >&2; exit 1; }
 if (( ! REPLAY )) && [[ "$ATTEMPT" != 1 ]]; then
   echo "ERROR: --attempt only means anything with --replay" >&2
   exit 1
@@ -55,7 +57,8 @@ REPLAY_DELAY="${DEMO_REPLAY_DELAY:-0}"
 BEATS_POSTED=0
 beat() {
   (( REPLAY )) || return 0
-  if (( BEATS_POSTED > 0 )) && [[ "$REPLAY_DELAY" != "0" ]]; then
+  # numeric zero test, not string: "0", "00", "0.0", unset all mean no sleep
+  if (( BEATS_POSTED > 0 )) && awk -v d="$REPLAY_DELAY" 'BEGIN{exit !(d+0 > 0)}'; then
     sleep "$REPLAY_DELAY"
   fi
   BEATS_POSTED=$((BEATS_POSTED + 1))
