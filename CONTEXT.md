@@ -124,7 +124,7 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
   `{{issue}}`, `{{precedent}}`, `{{precedent_sha}}`, `{{today}}`,
   `{{fresh_reqid}}`. A reference qualifies only if replay can resolve its
   fresh value deterministically with no operator input; judgment prose is
-  never rewritten, and frozen-world dates (the agents' reachable world at
-  the tag: baseline demo-app content and the project skills) pass the
-  coherence lint verbatim. (ADR-0005, superseding ADR-0004's
-  only-the-self-pointer clause.)
+  never rewritten, and frozen-world literals (dates and sha-shaped tokens
+  from the agents' reachable world at the tag: baseline demo-app content
+  and the project skills) pass the coherence lint verbatim. (ADR-0005,
+  superseding ADR-0004's only-the-self-pointer clause.)

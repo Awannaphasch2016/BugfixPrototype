@@ -85,14 +85,17 @@ FROZEN_DATES=$(
       grep -oP '"time":\K[0-9]{10,13}' |
       while read -r T; do date -u -d "@${T:0:10}" +%F 2>/dev/null; done; } | sort -u
 )
-frozen_date() { # <YYYY-MM-DD or slash date> — 0 when the date cannot go stale
-  grep -qxF "$1" <<<"$FROZEN_DATES" && return 0
-  # Only the agents' reachable world counts as frozen: the baseline demo-app
-  # tree (seeded log payloads, the docs corpus) and the project skills the
-  # Skill tool hands every agent session. Both are frozen at the tag, so a
-  # date quoted from them can never go stale. The wider repo's spec/record
-  # dates deliberately do NOT qualify.
+# Only the agents' reachable world counts as frozen: the baseline demo-app
+# tree (seeded tasks, log payloads, the docs corpus) and the project skills
+# the Skill tool hands every agent session. Both are frozen at the tag, so a
+# token quoted from them — a seeded task id, a documented date — can never
+# go stale. The wider repo's spec/record dates deliberately do NOT qualify.
+frozen_token() { # <literal> — 0 when the token lives in the frozen world
   git grep -qF "$1" "$TAG" -- demo-app .claude/skills >/dev/null 2>&1
+}
+frozen_date() { # dates also qualify when derived from the log's epochs
+  grep -qxF "$1" <<<"$FROZEN_DATES" && return 0
+  frozen_token "$1"
 }
 
 FAILED=0
@@ -106,16 +109,16 @@ check() { # <artifact-label> <file> <perl-regex> <what>
   done <<<"$hits"
 }
 
-check_dates() { # <artifact-label> <file>
+check_tokens() { # <artifact-label> <file> <perl-regex> <what> <frozen-fn>
   local toks tok hits
-  toks=$(grep -oP '\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b|\b[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}\b' "$2" | sort -u || true)
+  toks=$(grep -oP "$3" "$2" | sort -u || true)
   [[ -n "$toks" ]] || return 0
   while IFS= read -r tok; do
-    frozen_date "$tok" && continue
+    "$5" "$tok" && continue
     FAILED=1
     hits=$(grep -nF "$tok" "$2" || true)
     while IFS= read -r hit; do
-      echo "COHERENCE: date in $1 line ${hit%%:*}: ${hit#*:}" >&2
+      echo "COHERENCE: $4 in $1 line ${hit%%:*}: ${hit#*:}" >&2
     done <<<"$hits"
   done <<<"$toks"
 }
@@ -123,11 +126,14 @@ check_dates() { # <artifact-label> <file>
 # The issue-number pattern's lookahead spares hex colors ("#22c55e" is not an
 # issue reference); an all-digit token like "#123" still fails strict — a
 # recapture costs minutes, a stale number on stage costs the pitch. The URL
-# alternates catch tracker references the prose forms miss.
+# alternates catch tracker references the prose forms miss. Issue refs get
+# NO frozen-world exception: in prose they are always tracker coordinates,
+# and short "#N" literals would false-match inside frozen content. Shas and
+# dates are long enough for the literal lookup to be meaningful.
 lint() { # <artifact-label> <file>
   check "$1" "$2" '#[0-9]+(?![0-9a-fA-F])|\b[Ii]ssue[ -]#?[0-9]+|/(issues|pull)/[0-9]+' "issue number (foreign — own and precedent numbers are already variables)"
-  check "$1" "$2" '\b[0-9a-f]{7,40}\b' "commit sha (or sha-shaped token)"
-  check_dates "$1" "$2"
+  check_tokens "$1" "$2" '\b[0-9a-f]{7,40}\b' "commit sha (or sha-shaped token)" frozen_token
+  check_tokens "$1" "$2" '\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b|\b[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}\b' "date" frozen_date
 }
 
 for REL in "${PROSE_MD[@]}"; do
