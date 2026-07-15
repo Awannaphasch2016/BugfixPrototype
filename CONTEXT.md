@@ -119,3 +119,11 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
   the agent work is certified cache and the machinery is live. The record stays
   real; replay never certifies. (Presentation rule amended 2026-07-13,
   superseding "never shown to an audience"; see ADR-0004.)
+- **Replay variables** — the coordinates in cached prose that capture
+  normalizes and replay resolves from the fresh cycle's own record:
+  `{{issue}}`, `{{precedent}}`, `{{precedent_sha}}`, `{{today}}`,
+  `{{fresh_reqid}}`. A reference qualifies only if replay can resolve its
+  fresh value deterministically with no operator input; judgment prose is
+  never rewritten, and frozen-world dates (baseline demo-app content) pass
+  the coherence lint verbatim. (ADR-0005, superseding ADR-0004's
+  only-the-self-pointer clause.)

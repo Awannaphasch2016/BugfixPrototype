@@ -165,8 +165,29 @@ jq -n --arg title "$TITLE" --arg slug "$SLUG" \
   > "$CACHE_DIR/meta.json"
 
 # Coherence gate, last: nothing that can go stale enters the cache. A dirty
-# artifact rejects the whole entry — fix at the source and recapture.
-if ! harness/cache-coherence.sh "$CACHE_DIR" "$ISSUE"; then
+# artifact rejects the whole entry — fix at the source and recapture. The
+# replay variables' capture-side values (ADR-0005) all come from the record
+# itself: the precedent link and firing reqId from the issue body (what the
+# agents were shown), the precedent's commit shas from its merged PR, the run
+# date from this PR's merge timestamp.
+ISSUE_BODY=$(gh issue view "$ISSUE" --json body -q .body)
+COHERENCE_ARGS=("$CACHE_DIR" "$ISSUE")
+PRECEDENT=$(grep -oP 'precedent: \[#\K[0-9]+' <<<"$ISSUE_BODY" | head -1 || true)
+if [[ -n "$PRECEDENT" ]]; then
+  COHERENCE_ARGS+=(--precedent "$PRECEDENT")
+  PRECEDENT_PR=$(gh pr list --state merged --limit 500 --json number,headRefName \
+    --jq ".[] | select(.headRefName == \"fix/issue-$PRECEDENT\") | .number" | head -n1)
+  if [[ -n "$PRECEDENT_PR" ]]; then
+    PRECEDENT_SHAS=$(gh pr view "$PRECEDENT_PR" --json commits,mergeCommit \
+      --jq '[.commits[].oid, .mergeCommit.oid] | map(select(. != null)) | join(",")')
+    [[ -z "$PRECEDENT_SHAS" ]] || COHERENCE_ARGS+=(--precedent-shas "$PRECEDENT_SHAS")
+  fi
+fi
+RUN_DATE=$(gh pr view "$PR" --json mergedAt -q .mergedAt | cut -c1-10)
+[[ -z "$RUN_DATE" || "$RUN_DATE" == "null" ]] || COHERENCE_ARGS+=(--run-date "$RUN_DATE")
+FIRING_REQID=$(grep -oP '"level":50[^\n]*?"reqId":"\K[a-z0-9]+' <<<"$ISSUE_BODY" | tail -1 || true)
+[[ -z "$FIRING_REQID" ]] || COHERENCE_ARGS+=(--firing-reqid "$FIRING_REQID")
+if ! harness/cache-coherence.sh "${COHERENCE_ARGS[@]}"; then
   rm -rf "$CACHE_DIR"
   echo "ERROR: coherence lint rejected the capture — entry removed; recapture after fixing the artifacts at their source" >&2
   exit 1

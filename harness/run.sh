@@ -64,10 +64,42 @@ beat() {
   BEATS_POSTED=$((BEATS_POSTED + 1))
 }
 
-# Replay substitutes the fresh cycle's issue number into each posted
-# artifact's {{issue}} placeholder (written by capture's coherence pass) —
-# the one rewrite a cached artifact ever gets.
-fill_issue() { sed "s/{{issue}}/$ISSUE/g"; }
+# Replay variables (ADR-0005): capture normalized every live-resolvable
+# coordinate in cached prose to a variable; replay resolves each one from the
+# fresh cycle's own record and substitutes it at post time. Judgment prose is
+# never rewritten — only these coordinates are. Resolution is lazy (only
+# variables the entry actually uses) and a variable that cannot resolve
+# aborts the run: better no artifact than a lying one.
+SED_FILL=""
+resolve_replay_vars() { # needs $CACHE_DIR, $ISSUE, $BODY (fresh issue body)
+  SED_FILL="s/{{issue}}/$ISSUE/g"
+  local precedent="" precedent_pr sha reqid
+  if grep -rqF '{{precedent}}' "$CACHE_DIR" || grep -rqF '{{precedent_sha}}' "$CACHE_DIR"; then
+    precedent=$(grep -oP 'precedent: \[#\K[0-9]+' <<<"$BODY" | head -1 || true)
+    [[ -n "$precedent" ]] ||
+      abort "cache entry uses {{precedent}} but issue #$ISSUE's body names no precedent — replay a follow-up only on a precedented issue"
+    SED_FILL+=";s/{{precedent}}/$precedent/g"
+  fi
+  if grep -rqF '{{precedent_sha}}' "$CACHE_DIR"; then
+    precedent_pr=$(gh pr list --state merged --limit 500 --json number,headRefName \
+      --jq ".[] | select(.headRefName == \"fix/issue-$precedent\") | .number" | head -n1)
+    [[ -n "$precedent_pr" ]] ||
+      abort "cache entry uses {{precedent_sha}} but precedent #$precedent has no merged fix PR"
+    sha=$(gh pr view "$precedent_pr" --json commits --jq '.commits[0].oid' | cut -c1-7)
+    [[ -n "$sha" ]] || abort "could not resolve the precedent fix's commit sha"
+    SED_FILL+=";s/{{precedent_sha}}/$sha/g"
+  fi
+  if grep -rqF '{{today}}' "$CACHE_DIR"; then
+    SED_FILL+=";s/{{today}}/$(date -u +%F)/g"
+  fi
+  if grep -rqF '{{fresh_reqid}}' "$CACHE_DIR"; then
+    reqid=$(grep -oP '"level":50[^\n]*?"reqId":"\K[a-z0-9]+' <<<"$BODY" | tail -1 || true)
+    [[ -n "$reqid" ]] ||
+      abort "cache entry uses {{fresh_reqid}} but issue #$ISSUE's body carries no level-50 firing line"
+    SED_FILL+=";s/{{fresh_reqid}}/$reqid/g"
+  fi
+}
+fill_issue() { sed "$SED_FILL"; }
 
 abort() {
   echo "ERROR: $1" >&2
@@ -224,6 +256,7 @@ if (( REPLAY )); then
   CACHE_DIR="harness/private/cache/$SLUG/attempt-$ATTEMPT"
   [[ -f "$CACHE_DIR/fix.patch" && -f "$CACHE_DIR/result.json" ]] ||
     abort "no cache entry for \"$TITLE\" (attempt $ATTEMPT) — capture a certified run with harness/capture.sh"
+  resolve_replay_vars
   [[ -z "$NOTE" ]] ||
     echo "WARNING: replay composes no prompt — the note is ignored here (it was already posted to the issue by the dispatcher)" >&2
 

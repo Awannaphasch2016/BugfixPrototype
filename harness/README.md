@@ -52,10 +52,12 @@ directory; this directory owns everything deterministic.
   answer-key bug title and attempt, plus its transcript and result JSON, each
   entry declaring the state its patch applies to (`--follow-up` writes
   attempt-2, based on the baseline plus attempt-1's fix). The final step is
-  the coherence pass (`cache-coherence.sh`): the entry's own issue number
-  becomes the `{{issue}}` placeholder, and any foreign issue number, commit
-  sha, or date in cached prose rejects the capture — fix at the source and
-  recapture. Capture only after the rehearsal ritual passes; any
+  the coherence pass (`cache-coherence.sh`): every live-resolvable
+  coordinate in cached prose becomes a replay variable — `{{issue}}`,
+  `{{precedent}}`, `{{precedent_sha}}`, `{{today}}`, `{{fresh_reqid}}`
+  (ADR-0005), values read from the record itself — and any remaining issue
+  number, commit sha, or non-frozen date rejects the capture: fix at the
+  source and recapture. Capture only after the rehearsal ritual passes; any
   prompt-shape change makes the whole cache stale as evidence — recapture from
   freshly certified runs.
 - `reset.sh` — starts a fresh demo cycle: force-resets main (local + GitHub)
