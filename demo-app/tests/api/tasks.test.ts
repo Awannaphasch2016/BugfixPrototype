@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp } from "fs/promises";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import { GET, POST } from "@/app/api/tasks/route";
@@ -91,6 +91,42 @@ describe("PATCH /api/tasks/:id", () => {
     const list = await (await listTasks()).json();
     expect(list.tasks).toHaveLength(1);
     expect(list.tasks[0].title).toBe("Draft agenda");
+  });
+
+  it("logs a rejected update at warn, not error", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "tasks-log-"));
+    const logFile = path.join(dir, "app.log");
+    const prevEnv = process.env.NODE_ENV;
+    process.env.LOG_FILE = logFile;
+    process.env.NODE_ENV = "development"; // logger is disabled when NODE_ENV === "test"
+    vi.resetModules(); // re-init the pino singleton with the env above
+    try {
+      const { POST: post } = await import("@/app/api/tasks/route");
+      const { PATCH: patch } = await import("@/app/api/tasks/[id]/route");
+      const createRes = await post(
+        jsonRequest("http://localhost/api/tasks", "POST", { title: "Draft agenda" })
+      );
+      const { task } = await createRes.json();
+      const res = await patch(
+        jsonRequest(`http://localhost/api/tasks/${task.id}`, "PATCH", {
+          title: "x".repeat(101),
+        }),
+        { params: Promise.resolve({ id: task.id }) }
+      );
+      expect(res.status).toBe(400);
+
+      const lines = (await readFile(logFile, "utf8"))
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l));
+      const rejection = lines.find((l) => l.msg === "task update failed validation");
+      expect(rejection).toBeDefined();
+      expect(rejection.level).toBe(40); // warn — rejected input is not an application error
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+      delete process.env.LOG_FILE;
+      vi.resetModules();
+    }
   });
 });
 
