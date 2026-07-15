@@ -99,12 +99,23 @@ Glossary only. Decisions and their rationale live in `docs/` (specs, handoffs).
 - **Baseline** — the tagged repo state with bugs planted, logs seeded, suite green.
   **Reset** rewinds the code to it and starts a fresh demo cycle: the old cycle's
   issues are retired, and fresh issues are filed with clean timelines.
-- **Rehearsal ritual** — reset → run → audit transcript; a bug is demo-ready only
-  after this passes with the exact demo-day configuration.
+- **Rehearsal ritual** — two legs, in order. Leg 1, certification: reset → live
+  runs → transcript audit; the only leg that certifies agent output and fills
+  the agent-output cache; re-run whenever the cache goes stale (any prompt- or
+  stage-shape change). Leg 2, dress rehearsal: reset → the replayed walkthrough
+  end-to-end with the exact demo-day configuration, clocks recorded. A scene is
+  demo-ready only after both legs pass; replay never certifies.
 - **Agent-output cache** — the answer-key store of rehearsal-certified fix
-  patches (against the baseline) and their transcripts, keyed by answer-key
-  bug title. Captured only from runs that passed the rehearsal ritual.
+  patches and their transcripts, keyed by answer-key bug title and attempt.
+  Every entry declares the state its patch applies to: the baseline for a
+  first attempt; the baseline plus the prior fix for a follow-up attempt
+  (replay order is enforced by the routing policy, which only reaches a
+  follow-up after the first fix merged). Captured only from runs that passed
+  the rehearsal ritual.
 - **Replay mode** — the runner mode that applies a cached patch and transcript
   instead of spawning the fixer agent, while everything downstream (git, PR,
-  comments, gates) runs for real. A development and pre-run tool; a replayed
-  run is never presented as live — the record stays real.
+  comments, gates) runs for real. A development, pre-run, and on-stage tool; a
+  replayed run is never presented as live *generation* — the audience is told
+  the agent work is certified cache and the machinery is live. The record stays
+  real; replay never certifies. (Presentation rule amended 2026-07-13,
+  superseding "never shown to an audience"; see ADR-0004.)

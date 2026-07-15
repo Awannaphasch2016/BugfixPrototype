@@ -207,3 +207,140 @@ Nothing here may touch the certified paths without re-certification.
 **Blocked by:** 9.
 
 - [ ] (deliberately empty until certification passes)
+
+---
+
+# Tickets: Stage 4b — the replay-driven walkthrough
+
+Builds `docs/stage-4b-spec.md`: the walkthrough runs in replay mode behind
+the normal UI — certified agent output, live machinery, narrated as exactly
+that (ADR-0004). Stage 4's ladder above is history; its ticket 9 verdict is
+superseded by ticket 4b-8 here.
+
+Work the **frontier**: any ticket whose blockers are all done. 4b-1, 4b-4,
+and 4b-5 can all start immediately; the ritual tail (4b-6 → 4b-7 → 4b-8) is
+strictly linear.
+
+## 4b-1. Attempt-aware agent-output cache
+
+**What to build:** the cache holds per-attempt entries under each answer-key
+title, each declaring the state its patch applies to (the baseline for a
+first attempt; the baseline plus the prior fix for a follow-up). The capture
+script writes the new layout; existing entries migrate mechanically. Replay
+selects an attempt — first attempt by default, follow-up on request — and
+applies it.
+
+**Blocked by:** None — can start immediately.
+
+- [ ] Capture writes per-attempt entries with a declared base; existing
+      cache entries migrated without content changes.
+- [ ] Replay of a first attempt behaves exactly as today (mechanics test
+      stays green).
+- [ ] Replay can select a follow-up attempt and applies it on top of the
+      first fix's merged state.
+
+## 4b-2. Coherence at capture
+
+**What to build:** cached prose can never go stale. Capture normalizes the
+artifact's reference to its own issue number into a placeholder and fails
+loudly (lint) on any foreign issue number, commit sha, or date; replay
+substitutes the fresh issue number into posted artifacts. Nothing else in a
+cached artifact is ever rewritten.
+
+**Blocked by:** 4b-1.
+
+- [ ] A dirty artifact (foreign issue number, sha, or date) fails capture
+      with a message naming the offending line.
+- [ ] The entry's own issue number round-trips: placeholder at capture,
+      fresh number in the replayed comment/review/evidence.
+- [ ] Mechanics test covers both the rejection and the substitution.
+
+## 4b-3. Replay behind the one switch, with the banner
+
+**What to build:** one environment variable flips the whole world. With it
+set: chat Dispatch replays the first attempt, the signal route's
+auto-dispatch replays the follow-up, setup's pre-run replays, and the chat
+UI shows an always-visible, audience-friendly replay banner (mode exposed
+by the chat server). With it unset: everything runs live, no banner, no
+replay flag passed anywhere — a normal dispatch can never silently replay.
+
+**Blocked by:** 4b-1.
+
+- [ ] Route tests: switch on → dispatch and auto-dispatch pass the replay
+      flag with the correct attempt; switch off → no caller passes it.
+- [ ] Setup's pre-run obeys the same switch (live when off — leg 1's
+      capture path).
+- [ ] Banner renders whenever the switch is set, in every chat view.
+
+## 4b-4. Paced replay
+
+**What to build:** replayed artifacts arrive beat by beat. A tuning-knob
+environment variable sets the seconds replay sleeps between stage posts;
+zero or unset keeps the instant fixture; live runs are unaffected. The
+delay is stage rhythm, never presented as agent latency.
+
+**Blocked by:** None — can start immediately.
+
+- [ ] Mechanics test: beats are separated by the configured delay; unset
+      means no sleeps.
+- [ ] Live-run behavior is untouched by the knob.
+
+## 4b-5. Live precedent reference in the context report
+
+**What to build:** an auto-filed issue's context report names its problem
+class and links its precedent issue when one exists — computed at filing
+time, so it is correct every cycle. The demo-scale expression of semantic
+instance identity (the full system is roadmap, per ADR-0004).
+
+**Blocked by:** None — can start immediately.
+
+- [ ] Route tests: precedented class → report names the class and links the
+      precedent issue; novel class → report names the class, no link.
+- [ ] Redaction and fail-safe behavior of the report pipeline unchanged.
+
+## 4b-6. Rebaseline over the stage-4b commits
+
+**What to build:** running `harness/reset.sh` stays safe. Move
+`demo-baseline` forward over all stage-4b construction per the runbook's
+rebaseline procedure (cherry-pick construction — never fast-forward once a
+cycle's autofix is on main).
+
+**Blocked by:** 4b-1, 4b-2, 4b-3, 4b-4, 4b-5.
+
+- [ ] Tag contains every stage-4b harness/docs commit on main; demo-app
+      tree identical to the previous tag's.
+- [ ] A reset after this ticket would delete nothing from main.
+
+## 4b-7. Leg-1 certification: recapture the cache
+
+**What to build:** the cache refilled through the new capture path from
+live certified runs (switch off, agents real). Includes the two owed
+entries: clean todo-list evidence captured against a genuinely broken
+build, and the follow-up attempt for the autonomous scene (captured as a
+follow-up entry, never over the first fix). Every entry passes the
+coherence lint. Rehearsal records land in the answer key.
+
+**Blocked by:** 4b-2, 4b-6.
+
+- [ ] Every walkthrough slot has a lint-clean cache entry, including the
+      follow-up attempt with its declared base.
+- [ ] The todo-list evidence describes a real before-symptom.
+- [ ] Transcript audits recorded in the answer key per the ritual.
+
+## 4b-8. Leg-2 dress rehearsal: choreography + demo-ready verdict
+
+**What to build:** the acceptance test of the spec. Re-author the runbook's
+choreography around the replayed walkthrough (beats kept, waits at the
+demo-day delay value, the autonomous scene's auto-merge as an on-stage
+beat, the close absorbing reclaimed time) and update the demo-ops skill in
+the same change set. Then the full dress rehearsal: reset → setup → every
+scene with the exact demo-day configuration, clocks recorded, demo-ready
+verdict written. Until green, the demo is the last certified state.
+
+**Blocked by:** 4b-3, 4b-4, 4b-7.
+
+- [ ] Runbook choreography and demo-ops skill updated together (glossary,
+      ADR-0004, and runbook must not drift).
+- [ ] Every scene rehearsed end-to-end under the demo-day env; per-scene
+      clocks recorded; the auto-merge lands on stage.
+- [ ] Demo-ready verdict recorded in the answer key.
