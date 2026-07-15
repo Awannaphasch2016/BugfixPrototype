@@ -43,11 +43,17 @@ export async function solvedEntries(): Promise<SolvedEntry[]> {
 // The precedent ledger read (ADR-0002): a problem class has precedent when a
 // closed-as-completed issue carrying its label has a merged fix-branch PR —
 // exactly a solved record whose issue wears the label. Labels ride the solved
-// queries; no other store exists to consult.
-export async function hasPrecedent(classLabel: string): Promise<boolean> {
-  return (await solvedRecords()).some(({ issue }) =>
+// queries; no other store exists to consult. Returns the precedent issue
+// itself (the most recent, when a class has several) so the context report
+// can link it at filing time (stage-4b: correct every cycle, never cached).
+export async function precedentFor(classLabel: string): Promise<IssueRef | null> {
+  const wearing = (await solvedRecords()).filter(({ issue }) =>
     issue.labels.some((label) => label.name === classLabel),
   );
+  const latest = wearing.at(-1);
+  return latest
+    ? { number: latest.issue.number, title: latest.issue.title, url: latest.issue.url }
+    : null;
 }
 
 async function solvedRecords(): Promise<{ issue: GhIssue; pr: PrRef }[]> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChatContainer,
   ConversationHeader,
@@ -67,6 +67,17 @@ export default function Home() {
   // one card expanded at a time, draft discarded when expansion moves on.
   const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+  // The replay banner renders from the server's mode exposure (the same
+  // switch every dispatch path obeys): visible whenever replay is on, so the
+  // presentation never claims live generation it isn't doing (ADR-0004).
+  const [replayMode, setReplayMode] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((res) => res.json())
+      .then((cfg: { replay?: boolean }) => setReplayMode(Boolean(cfg.replay)))
+      .catch(() => {});
+  }, []);
 
   function add(msg: DistributiveOmit<ChatMessage, "id">) {
     const id = nextId.current++;
@@ -421,6 +432,13 @@ export default function Home() {
 
   return (
     <main className="chat-shell">
+      {replayMode && (
+        <div className="replay-banner">
+          Replaying certified agent runs — the agent output in this walkthrough
+          was generated and certified in earlier live runs; routing, PRs,
+          gates, and merges are happening live.
+        </div>
+      )}
       <MainContainer>
         <ChatContainer>
           <ConversationHeader>

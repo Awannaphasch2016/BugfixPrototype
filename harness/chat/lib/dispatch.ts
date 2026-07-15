@@ -1,4 +1,4 @@
-import { ghCmd, runnerCmd } from "@/lib/config";
+import { ghCmd, replayMode, runnerCmd } from "@/lib/config";
 import {
   acquireRunLock,
   recordDispatch,
@@ -16,9 +16,18 @@ export type DispatchResult =
   | { ok: true; prUrl: string; prNumber: number }
   | { ok: false; status: number; error: string };
 
+// The dispatch context, not operator input: a human dispatch replays the
+// first attempt, the signal route's auto-dispatch replays the follow-up
+// (stage-4b spec). Only consulted when the replay switch is on.
+export type ReplayAttempt = "first" | "follow-up";
+
 const PR_URL = /https:\/\/github\.com\/\S+\/pull\/(\d+)/g;
 
-export async function dispatchIssue(issue: number, note?: string): Promise<DispatchResult> {
+export async function dispatchIssue(
+  issue: number,
+  note?: string,
+  attempt: ReplayAttempt = "first",
+): Promise<DispatchResult> {
   if (!acquireRunLock()) {
     return { ok: false, status: 409, error: "a run is already in flight" };
   }
@@ -31,7 +40,14 @@ export async function dispatchIssue(issue: number, note?: string): Promise<Dispa
       // fails to post, the dispatch aborts and the runner is never spawned.
       await run(ghCmd(), ["issue", "comment", String(issue), "--body", note]);
     }
-    const output = await run(runnerCmd(), note ? [String(issue), note] : [String(issue)]);
+    // The switch decides whether the runner's explicit replay flag is passed
+    // at all; with it off, no caller anywhere passes it (the never-silent
+    // guarantee lives here, not in the runner).
+    const args = replayMode()
+      ? ["--replay", "--attempt", attempt === "follow-up" ? "2" : "1", String(issue)]
+      : [String(issue)];
+    if (note) args.push(note);
+    const output = await run(runnerCmd(), args);
 
     const prUrl = [...output.matchAll(PR_URL)].at(-1);
     if (!prUrl) {

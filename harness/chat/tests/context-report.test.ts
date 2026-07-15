@@ -215,6 +215,40 @@ describe("composeContextReport", () => {
     });
     expect(report).toContain("````log\nweird ``` inside\n````");
   });
+
+  it("names the problem class and links the precedent issue when one exists", () => {
+    const report = composeContextReport({
+      signature: "thing exploded",
+      excerpt: "boom",
+      matchCount: 1,
+      problemClass: "class:thing-exploded",
+      precedent: { number: 30, url: "https://github.com/acme/BugfixPrototype/issues/30" },
+    });
+    expect(report).toContain("**Problem class:** `class:thing-exploded`");
+    expect(report).toContain("[#30](https://github.com/acme/BugfixPrototype/issues/30)");
+  });
+
+  it("names the class without a link when the class is novel", () => {
+    const report = composeContextReport({
+      signature: "thing exploded",
+      excerpt: "boom",
+      matchCount: 1,
+      problemClass: "class:thing-exploded",
+      precedent: null,
+    });
+    expect(report).toContain("**Problem class:** `class:thing-exploded`");
+    expect(report).toContain("no precedent");
+    expect(report).not.toContain("](");
+  });
+
+  it("omits the class line entirely when no class is supplied (the CLI filing path)", () => {
+    const report = composeContextReport({
+      signature: "thing exploded",
+      excerpt: "boom",
+      matchCount: 1,
+    });
+    expect(report).not.toContain("Problem class");
+  });
 });
 
 // --- The filing seam: compose-report CLI + redaction command boundary ------

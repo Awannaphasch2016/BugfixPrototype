@@ -31,7 +31,16 @@ if ! gh label list --json name -q '.[].name' | grep -qxF "$LABEL"; then
     --description "Solved with no human in the loop — applied by the pipeline at auto-merge"
 fi
 
-harness/run.sh "$ISSUE"
+# The pre-run obeys the one replay switch (stage-4b): with DEMO_REPLAY set,
+# setup replays bug 1's certified first attempt and prep takes seconds; with
+# it unset the run is live — leg 1's certification path, whose output capture
+# feeds the cache. Same semantics as the chat server's replayMode().
+if [[ -n "${DEMO_REPLAY:-}" && "${DEMO_REPLAY}" != "0" && "${DEMO_REPLAY}" != "false" ]]; then
+  echo "==> replay switch on (DEMO_REPLAY=$DEMO_REPLAY): pre-run replays the certified cache"
+  harness/run.sh --replay "$ISSUE"
+else
+  harness/run.sh "$ISSUE"
+fi
 
 PR=$(gh pr list --state open --head "fix/issue-$ISSUE" --json number -q '.[0].number')
 [[ -n "$PR" && "$PR" != "null" ]] ||

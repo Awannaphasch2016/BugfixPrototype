@@ -210,6 +210,15 @@ export interface ContextReportInput {
   excerpt: string;
   /** How many times the signature fired in the captured log. */
   matchCount: number;
+  /** The signature's problem-class label; omitted, no class line appears. */
+  problemClass?: string;
+  /**
+   * The precedent issue backing an autonomous route, or null when the class
+   * is novel. Supplied by the caller at filing time (stage-4b: the report
+   * answers "why did this route autonomously" freshly every cycle); only
+   * meaningful alongside problemClass.
+   */
+  precedent?: { number: number; url: string } | null;
 }
 
 /** Compose the markdown context-report section for an issue body. */
@@ -219,11 +228,21 @@ export function composeContextReport(input: ContextReportInput): string {
   const fence = "`".repeat(Math.max(3, longestRun + 1));
   const times = `${input.matchCount} occurrence${input.matchCount === 1 ? "" : "s"}`;
 
+  const classLines = input.problemClass
+    ? [
+        input.precedent
+          ? `**Problem class:** \`${input.problemClass}\` — precedent: [#${input.precedent.number}](${input.precedent.url}), fixed by a merged PR, so this signal routes autonomously.`
+          : `**Problem class:** \`${input.problemClass}\` — no precedent on the ledger yet; the first dispatch waits for a human.`,
+        "",
+      ]
+    : [];
+
   return [
     "## Context report",
     "",
     `**Signal signature:** \`${input.signature}\` — ${times} in the captured log; excerpt around the most recent firing.`,
     "",
+    ...classLines,
     `${fence}log`,
     input.excerpt,
     fence,

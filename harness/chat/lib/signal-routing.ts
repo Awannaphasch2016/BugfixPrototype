@@ -13,7 +13,7 @@ import { dispatchIssue } from "@/lib/dispatch";
 import { NEEDS_HUMAN_LABEL, SIGNAL_TITLE, signatureToClass } from "@/lib/problem-class";
 import { acquireRunLock, releaseRunLock, runInFlight } from "@/lib/run-state";
 import { run, runWithInput } from "@/lib/shell";
-import { AUTOFIXED_LABEL, hasPrecedent } from "@/lib/solved";
+import { AUTOFIXED_LABEL, precedentFor, type IssueRef } from "@/lib/solved";
 
 // The routing policy as code (ADR-0002): dedupe by signature, then a
 // label-and-PR lookup. An open issue for the signature absorbs the repeat; a
@@ -80,14 +80,17 @@ export async function routeSignal(signature: string): Promise<RoutingVerdict> {
   const existing = open.find((issue) => issue.title === title);
   if (existing) return { routed: "absorbed", issue: existing.number };
 
-  // b. Context report — before anything is filed, and fail-safe: any failure
+  // b. Precedent: the label-and-PR lookup on the system of record. Read
+  // before composing so the report can name the class and link the precedent
+  // — computed at filing time, correct every cycle (stage-4b).
+  const classLabel = signatureToClass(signature);
+  const precedent = await precedentFor(classLabel);
+  const precedented = precedent !== null;
+
+  // c. Context report — before anything is filed, and fail-safe: any failure
   // here (log unreadable, signature absent, redaction command failing) means
   // no issue exists with unredacted content.
-  const report = await composeReport(signature);
-
-  // c. Precedent: the label-and-PR lookup on the system of record.
-  const classLabel = signatureToClass(signature);
-  const precedented = await hasPrecedent(classLabel);
+  const report = await composeReport(signature, classLabel, precedent);
 
   // d. File, labels first so the create cannot race a missing label.
   await ensureLabel(classLabel, CLASS_LABEL_COLOR, CLASS_LABEL_DESCRIPTION);
@@ -117,7 +120,11 @@ export async function routeSignal(signature: string): Promise<RoutingVerdict> {
   return { routed: "autofix", issue, class: classLabel };
 }
 
-async function composeReport(signature: string): Promise<string> {
+async function composeReport(
+  signature: string,
+  problemClass: string,
+  precedent: IssueRef | null,
+): Promise<string> {
   try {
     const logText = await readFile(signalLogFile(), "utf8");
     const excerpt = selectExcerpt(parseLogLines(logText), signature);
@@ -127,7 +134,13 @@ async function composeReport(signature: string): Promise<string> {
     const canonical = canonicalizePaths(excerpt.text);
     const spans = parseRedactionSpans(await runWithInput(redactCmd(), [], canonical));
     const redacted = applyRedactions(canonical, codePointSpansToUtf16(canonical, spans));
-    return composeContextReport({ signature, excerpt: redacted, matchCount: excerpt.matchCount });
+    return composeContextReport({
+      signature,
+      excerpt: redacted,
+      matchCount: excerpt.matchCount,
+      problemClass,
+      precedent: precedent ? { number: precedent.number, url: precedent.url } : null,
+    });
   } catch (error) {
     throw new ComposeFailure(
       `context report failed, refusing to file — ${
@@ -153,7 +166,10 @@ async function ensureLabel(name: string, color: string, description: string): Pr
 // record. Failures leave the record exactly as far as it truly got (an open
 // PR, an unlabeled issue); GitHub is the story, nothing here re-tells it.
 async function autoDispatchAndMerge(issue: number): Promise<void> {
-  const result = await dispatchIssue(issue);
+  // The auto-dispatch context: under the replay switch this lane replays the
+  // follow-up attempt — only reachable after the first fix merged, so the
+  // entry's declared base is already on main.
+  const result = await dispatchIssue(issue, undefined, "follow-up");
   if (!result.ok) return; // lock lost or run failed — the issue stays filed
 
   if (!acquireRunLock()) return; // a human got in first; they own the merge

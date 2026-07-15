@@ -1,5 +1,23 @@
 .chat-shell {
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-shell > .cs-main-container {
+  flex: 1;
+  min-height: 0;
+}
+
+/* The replay banner (stage-4b, ADR-0004): always visible while the switch is
+   on — honesty as a feature, sized for the projector, never dismissible. */
+.replay-banner {
+  background: #fff3cd;
+  border-bottom: 2px solid #e0a800;
+  color: #664d03;
+  font-weight: 600;
+  text-align: center;
+  padding: 8px 16px;
 }
 
 .card {

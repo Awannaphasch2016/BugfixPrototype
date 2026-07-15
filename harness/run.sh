@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
 # One-shot fixer runner: GitHub issue number in, open PR out.
 #
-#   harness/run.sh [--replay] <issue-number> [note]
+#   harness/run.sh [--replay [--attempt <n>]] <issue-number> [note]
 #
 # The optional note is the operator's judgment, already posted to the issue as
 # a comment by the dispatcher. It is spliced into the fixed prompt as a "note
 # from the team" section — added context between the bug report and the
 # contract, never a replacement for either.
 #
-# --replay applies the agent-output cache entry for the issue's title
-# (harness/private/cache/, written by harness/capture.sh) instead of spawning
-# the fixer; branch, commit, push, PR, and everything downstream run for real.
-# A build-time iteration and pre-run tool only: replay never certifies, and a
-# replayed run is never presented as live. Nothing replays without this flag.
+# --replay applies an agent-output cache entry for the issue's title
+# (harness/private/cache/<slug>/attempt-<n>/, written by harness/capture.sh)
+# instead of spawning the agents; branch, commit, push, PR, and everything
+# downstream run for real. --attempt selects the entry (default 1, the first
+# attempt; 2 is the follow-up, whose patch applies on top of the first fix's
+# merged state). Replay never certifies, and is never presented as live
+# generation — on stage it is narrated as certified agent output over live
+# machinery (ADR-0004). Nothing replays without this flag.
+#
+# DEMO_REPLAY_DELAY (seconds) paces replay: slept between artifact beats so
+# the product's asynchronous rhythm is demonstrated, not collapsed. Zero or
+# unset keeps replay the instant fixture; live runs never sleep. The delay is
+# stage rhythm, never presented as agent latency.
 #
 # The agent only diagnoses, tests, and fixes inside $APP_DIR. This script owns
 # every git operation (branch, commit, push, PR) so no plumbing step depends on
@@ -24,13 +32,39 @@ APP_DIR="demo-app" # config point: the directory the fixer agent is scoped to
 cd "$REPO_ROOT"
 
 REPLAY=0
-if [[ "${1-}" == "--replay" ]]; then
-  REPLAY=1
-  shift
+ATTEMPT=1
+while [[ "${1-}" == --* ]]; do
+  case "$1" in
+    --replay) REPLAY=1; shift ;;
+    --attempt) ATTEMPT="${2:?ERROR: --attempt needs a number}"; shift 2 ;;
+    *) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
+  esac
+done
+if (( ! REPLAY )) && [[ "$ATTEMPT" != 1 ]]; then
+  echo "ERROR: --attempt only means anything with --replay" >&2
+  exit 1
 fi
 
-ISSUE="${1:?usage: harness/run.sh [--replay] <issue-number> [note]}"
+ISSUE="${1:?usage: harness/run.sh [--replay [--attempt <n>]] <issue-number> [note]}"
 NOTE="${2-}"
+
+# Beat pacing (stage-4b): in replay, sleep the configured delay between
+# artifact beats — plan, PR, gate report, evidence, review. First beat lands
+# immediately; a live run passes straight through.
+REPLAY_DELAY="${DEMO_REPLAY_DELAY:-0}"
+BEATS_POSTED=0
+beat() {
+  (( REPLAY )) || return 0
+  if (( BEATS_POSTED > 0 )) && [[ "$REPLAY_DELAY" != "0" ]]; then
+    sleep "$REPLAY_DELAY"
+  fi
+  BEATS_POSTED=$((BEATS_POSTED + 1))
+}
+
+# Replay substitutes the fresh cycle's issue number into each posted
+# artifact's {{issue}} placeholder (written by capture's coherence pass) —
+# the one rewrite a cached artifact ever gets.
+fill_issue() { sed "s/{{issue}}/$ISSUE/g"; }
 
 abort() {
   echo "ERROR: $1" >&2
@@ -180,18 +214,20 @@ EOF
 # ---- fixer stage ----------------------------------------------------------
 if (( REPLAY )); then
   # Replay: canned agents, real everything-else. The cache is keyed by
-  # answer-key bug title, so the fresh cycle's issue number doesn't matter.
+  # answer-key bug title and attempt, so the fresh cycle's issue number
+  # doesn't matter — it is substituted into the placeholder at post time.
   SLUG=$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' |
     sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
-  CACHE_DIR="harness/private/cache/$SLUG"
+  CACHE_DIR="harness/private/cache/$SLUG/attempt-$ATTEMPT"
   [[ -f "$CACHE_DIR/fix.patch" && -f "$CACHE_DIR/result.json" ]] ||
-    abort "no cache entry for \"$TITLE\" — capture a certified run with harness/capture.sh"
+    abort "no cache entry for \"$TITLE\" (attempt $ATTEMPT) — capture a certified run with harness/capture.sh"
   [[ -z "$NOTE" ]] ||
     echo "WARNING: replay composes no prompt — the note is ignored here (it was already posted to the issue by the dispatcher)" >&2
 
-  echo "==> REPLAY on issue #$ISSUE: $TITLE — cached fix, no agent (never present as live)"
+  echo "==> REPLAY on issue #$ISSUE: $TITLE (attempt $ATTEMPT) — certified cache, no agent (never present as live generation)"
   if [[ -f "$CACHE_DIR/plan.md" ]]; then
-    gh issue comment "$ISSUE" --body "$(cat "$CACHE_DIR/plan.md")" >/dev/null ||
+    beat
+    gh issue comment "$ISSUE" --body "$(fill_issue < "$CACHE_DIR/plan.md")" >/dev/null ||
       abort "could not post the cached plan comment to issue #$ISSUE"
     echo "==> REPLAY: cached plan comment posted to issue #$ISSUE"
   else
@@ -199,7 +235,7 @@ if (( REPLAY )); then
   fi
   git apply --3way "$CACHE_DIR/fix.patch" || abort "cached patch failed to apply"
   cp "$CACHE_DIR/result.json" "$RESULT_JSON"
-  PR_BODY=$(jq -r '.result' "$RESULT_JSON")
+  PR_BODY=$(jq -r '.result' "$RESULT_JSON" | fill_issue)
   [[ -n "$PR_BODY" && "$PR_BODY" != "null" ]] || abort "cache entry has no PR body"
 
   if [[ -f "$CACHE_DIR/transcript.jsonl" ]]; then
@@ -276,6 +312,7 @@ echo "==> [gates] green — $TESTS_GREEN_LINE; lint clean; regression: $RED_LINE
 
 git push -q -u origin "$BRANCH"
 
+beat
 if ! PR_URL=$(gh pr create --base main --head "$BRANCH" \
   --title "Fix #$ISSUE: $TITLE" \
   --body "$PR_BODY
@@ -291,6 +328,7 @@ PR_NUMBER="${PR_URL##*/}"
 # PR, informing the human merge decision alongside the review.
 GATE_REPORT=$(printf '## Gates — runner\n\n- Suite with the fix: %s\n- Lint: clean\n- Regression test: %s\n\nGates execute inside the runner; a failure aborts the attempt before anything is pushed (ADR-0003).' \
   "$TESTS_GREEN_LINE" "$RED_LINE")
+beat
 if gh pr comment "$PR_NUMBER" --body "$GATE_REPORT" >/dev/null; then
   echo "==> [gates] report posted to PR #$PR_NUMBER"
 else
@@ -313,7 +351,7 @@ if (( REPLAY )); then
   if [[ -d "$CACHE_DIR/evidence" ]]; then
     mkdir -p "$EVIDENCE_DIR"
     cp "$CACHE_DIR/evidence/"*.png "$EVIDENCE_DIR/" 2>/dev/null || true
-    EVIDENCE_MD=$(cat "$CACHE_DIR/evidence/evidence.md" 2>/dev/null || echo "")
+    EVIDENCE_MD=$( (fill_issue < "$CACHE_DIR/evidence/evidence.md") 2>/dev/null || echo "")
   else
     echo "WARNING: cache entry has no evidence/ — tester artifact skipped in replay" >&2
   fi
@@ -392,6 +430,7 @@ EOF
 fi
 
 if [[ -n "$EVIDENCE_MD" && -d "$EVIDENCE_DIR" ]]; then
+  beat
   git add "$EVIDENCE_DIR"
   git commit -q -m "Evidence: browser verification for #$ISSUE" \
     -m "Before/after screenshots taken by the tester agent in a real browser (Playwright). Committed to the branch because images cannot ride a CLI comment; embedded in the PR body by commit-pinned raw URL."
@@ -423,7 +462,7 @@ fi
 REVIEW_COMMENT=""
 if (( REPLAY )); then
   if [[ -f "$CACHE_DIR/review.md" ]]; then
-    REVIEW_COMMENT=$(cat "$CACHE_DIR/review.md")
+    REVIEW_COMMENT=$(fill_issue < "$CACHE_DIR/review.md")
   else
     echo "WARNING: cache entry has no review.md — reviewer artifact skipped in replay" >&2
   fi
@@ -472,6 +511,7 @@ EOF
     echo "WARNING: reviewer stage failed (see $REVIEW_JSON) — PR #$PR_NUMBER stands unreviewed" >&2
 fi
 if [[ -n "$REVIEW_COMMENT" ]]; then
+  beat
   if gh pr comment "$PR_NUMBER" --body "$REVIEW_COMMENT" >/dev/null; then
     echo "==> [reviewer] findings posted to PR #$PR_NUMBER (${REVIEWER_SECS}s)"
   else

@@ -1,17 +1,28 @@
 #!/usr/bin/env bash
 # Agent-output cache capture: save a rehearsal-certified fix as a patch
 # against the demo-baseline tag plus its transcript and result JSON, keyed by
-# answer-key bug title (issue numbers change every cycle; titles and the
-# tagged baseline don't).
+# answer-key bug title and attempt (issue numbers change every cycle; titles
+# and the tagged baseline don't).
 #
-#   harness/capture.sh <issue-number>
+#   harness/capture.sh <issue-number> [--follow-up]
 #
-# Run ONLY after the run has passed the rehearsal ritual (reset → run →
-# transcript audit). Two hard rules ride with the cache:
+# Each entry lands under cache/<slug>/attempt-<n>/ and declares the state its
+# patch applies to: attempt-1 applies to the baseline; --follow-up writes
+# attempt-2, whose patch applies to the baseline plus the first attempt's
+# merged fix (replay order is enforced by the routing policy — a follow-up is
+# only reachable after the first fix merged).
+#
+# Run ONLY after the run has passed the rehearsal ritual (leg 1: reset → live
+# runs → transcript audit). Two hard rules ride with the cache:
 #   - replay never certifies: a cached fix is evidence about the prompt that
 #     produced it, so any prompt-shape change makes the whole cache stale as
 #     evidence — recapture from freshly certified runs;
-#   - a replayed run is never presented to an audience as live.
+#   - a replayed run is never presented to an audience as live generation
+#     (ADR-0004: certified agent output, live machinery, narrated as such).
+#
+# The final step is the coherence pass (harness/cache-coherence.sh): the
+# entry's own issue number becomes the {{issue}} placeholder, and any foreign
+# issue number, commit sha, or date in cached prose rejects the capture.
 #
 # The cache lives in harness/private/cache/ — gitignored with the rest of the
 # answer key, never committed.
@@ -21,7 +32,16 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 TAG="demo-baseline"
-ISSUE="${1:?usage: harness/capture.sh <issue-number>}"
+ISSUE="${1:?usage: harness/capture.sh <issue-number> [--follow-up]}"
+ATTEMPT=1
+APPLIES_TO="baseline"
+if [[ "${2-}" == "--follow-up" ]]; then
+  ATTEMPT=2
+  APPLIES_TO="baseline+attempt-1"
+elif [[ -n "${2-}" ]]; then
+  echo "ERROR: unknown argument: $2 (only --follow-up is understood)" >&2
+  exit 1
+fi
 
 slugify() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g'
@@ -30,7 +50,7 @@ slugify() {
 TITLE=$(gh issue view "$ISSUE" --json title -q .title)
 [[ -n "$TITLE" ]] || { echo "ERROR: issue #$ISSUE has no title" >&2; exit 1; }
 SLUG=$(slugify "$TITLE")
-CACHE_DIR="harness/private/cache/$SLUG"
+CACHE_DIR="harness/private/cache/$SLUG/attempt-$ATTEMPT"
 
 # The attempt's merged PR: the runner names every fix branch fix/issue-<n>,
 # and GitHub keeps refs/pull/<pr>/head alive after branch deletion.
@@ -53,15 +73,26 @@ git diff "$FIX_SHA~1" "$FIX_SHA" -- demo-app > "$CACHE_DIR/fix.patch"
 [[ -s "$CACHE_DIR/fix.patch" ]] ||
   { echo "ERROR: empty patch from PR #$PR" >&2; rm -f "$CACHE_DIR/fix.patch"; exit 1; }
 
-# Durability check against the tag. A run captured mid-cycle carries context
-# from the fixes merged before it (demo order), so a direct apply can fail on
-# the virgin baseline while replay's git apply --3way still resolves it — the
-# preimage blobs ride along in the patch's index lines. Direct-apply failure
-# is therefore a warning, not an error.
+# Durability check against the entry's declared base: the tag for a first
+# attempt, the tag plus the first attempt's fix for a follow-up. A run
+# captured mid-cycle carries context from the fixes merged before it (demo
+# order), so a direct apply can fail on the declared base while replay's
+# git apply --3way still resolves it — the preimage blobs ride along in the
+# patch's index lines. Direct-apply failure is therefore a warning, not an
+# error.
 TMP_WORKTREE=$(mktemp -d)
 git worktree add -q --detach "$TMP_WORKTREE" "$TAG"
+if [[ "$ATTEMPT" == 2 ]]; then
+  FIRST_PATCH="harness/private/cache/$SLUG/attempt-1/fix.patch"
+  if [[ -f "$FIRST_PATCH" ]]; then
+    git -C "$TMP_WORKTREE" apply --3way "$REPO_ROOT/$FIRST_PATCH" 2>/dev/null ||
+      echo "WARNING: attempt-1 patch would not apply to $TAG — follow-up durability checked against the bare tag" >&2
+  else
+    echo "WARNING: no attempt-1 entry for \"$TITLE\" — capture the first attempt too, or replay of the follow-up has nothing to stand on" >&2
+  fi
+fi
 if ! git -C "$TMP_WORKTREE" apply --check "$REPO_ROOT/$CACHE_DIR/fix.patch" 2>/dev/null; then
-  echo "WARNING: patch does not apply directly to $TAG — captured mid-cycle;" >&2
+  echo "WARNING: patch does not apply directly to its declared base ($APPLIES_TO) — captured mid-cycle;" >&2
   echo "         replay in demo order, or rely on replay's 3-way fallback" >&2
 fi
 git worktree remove --force "$TMP_WORKTREE" >/dev/null
@@ -125,10 +156,20 @@ fi
 
 jq -n --arg title "$TITLE" --arg slug "$SLUG" \
   --argjson issue "$ISSUE" --argjson pr "$PR" \
+  --argjson attempt "$ATTEMPT" --arg appliesTo "$APPLIES_TO" \
   --arg headSha "$HEAD_SHA" --arg baseline "$(git rev-parse "$TAG")" \
   --arg capturedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{title: $title, slug: $slug, sourceIssue: $issue, sourcePr: $pr,
+  '{title: $title, slug: $slug, attempt: $attempt, appliesTo: $appliesTo,
+    sourceIssue: $issue, sourcePr: $pr,
     headSha: $headSha, baselineAtCapture: $baseline, capturedAt: $capturedAt}' \
   > "$CACHE_DIR/meta.json"
 
-echo "==> Captured \"$TITLE\" (issue #$ISSUE, PR #$PR) into $CACHE_DIR"
+# Coherence gate, last: nothing that can go stale enters the cache. A dirty
+# artifact rejects the whole entry — fix at the source and recapture.
+if ! harness/cache-coherence.sh "$CACHE_DIR" "$ISSUE"; then
+  rm -rf "$CACHE_DIR"
+  echo "ERROR: coherence lint rejected the capture — entry removed; recapture after fixing the artifacts at their source" >&2
+  exit 1
+fi
+
+echo "==> Captured \"$TITLE\" (issue #$ISSUE, PR #$PR, attempt $ATTEMPT, applies to $APPLIES_TO) into $CACHE_DIR"

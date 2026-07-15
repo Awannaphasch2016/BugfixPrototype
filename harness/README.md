@@ -5,7 +5,8 @@ directory; this directory owns everything deterministic.
 
 ## Scripts
 
-- `run.sh [--replay] <issue-number> [note]` — the one visible demo action,
+- `run.sh [--replay [--attempt <n>]] <issue-number> [note]` — the one
+  visible demo action,
   now a staged role pipeline: the **planner** (read-only) diagnoses and posts
   its plan to the issue as an attributed comment before any commit exists;
   the **fixer** implements (Claude Code, non-interactive, scoped to
@@ -32,15 +33,29 @@ directory; this directory owns everything deterministic.
   `claude`/`gh`/`npm` in a throwaway clone — no network, no agent). Fails cleanly (nothing pushed) if the
   agent errors, changes nothing, or touches files outside the app. Agent
   output and session transcript land in `harness/private/` for the rehearsal
-  audit. `--replay` swaps the fixer for the agent-output cache entry matching
-  the issue's title (canned agent, real everything-else) — a build-time
-  iteration and pre-run tool; replay never certifies a bug as demo-ready, a
-  replayed run is never presented as live, and nothing replays without the
-  explicit flag.
-- `capture.sh <issue-number>` — saves a rehearsal-certified attempt into the
-  agent-output cache (`harness/private/cache/`, gitignored with the answer
-  key): the fix as a patch keyed by answer-key bug title, plus its transcript
-  and result JSON. Capture only after the rehearsal ritual passes; any
+  audit. `--replay` swaps the agents for the agent-output cache entry
+  matching the issue's title (certified agent output, real everything-else);
+  `--attempt` selects the entry — 1 (default) is the first attempt, whose
+  patch applies to the baseline; 2 is the follow-up, applying on top of the
+  first fix's merged state. Replay substitutes the fresh issue number into
+  each posted artifact's `{{issue}}` placeholder, and `DEMO_REPLAY_DELAY`
+  (seconds) paces the artifact beats — stage rhythm for the walkthrough,
+  never presented as agent latency; zero/unset keeps replay the instant
+  build fixture. Replay never certifies a bug as demo-ready, is never
+  presented as live *generation* (on stage it is narrated as certified agent
+  output over live machinery, with the banner up — ADR-0004), and nothing
+  replays without the explicit flag. Replay/capture mechanics are verified
+  by `harness/tests/replay-mechanics.sh` (same stubbed-commands pattern).
+- `capture.sh <issue-number> [--follow-up]` — saves a rehearsal-certified
+  attempt into the agent-output cache (`harness/private/cache/<slug>/
+  attempt-<n>/`, gitignored with the answer key): the fix as a patch keyed by
+  answer-key bug title and attempt, plus its transcript and result JSON, each
+  entry declaring the state its patch applies to (`--follow-up` writes
+  attempt-2, based on the baseline plus attempt-1's fix). The final step is
+  the coherence pass (`cache-coherence.sh`): the entry's own issue number
+  becomes the `{{issue}}` placeholder, and any foreign issue number, commit
+  sha, or date in cached prose rejects the capture — fix at the source and
+  recapture. Capture only after the rehearsal ritual passes; any
   prompt-shape change makes the whole cache stale as evidence — recapture from
   freshly certified runs.
 - `reset.sh` — starts a fresh demo cycle: force-resets main (local + GitHub)
@@ -63,7 +78,9 @@ directory; this directory owns everything deterministic.
   closes the issue as completed), and applies the `autofixed` label — the
   lane's auditable marker, applied at the only moment autofixing happens.
   Creates the label first if the repo lacks it. The demo opens with bug 1
-  solved and badged, bugs 2 and 3 open, no open PRs.
+  solved and badged, bugs 2 and 3 open, no open PRs. With `DEMO_REPLAY` set
+  the pre-run replays bug 1's certified first attempt (prep in seconds); with
+  it unset the run is live — leg 1's certification path.
 
 ## Chat control surface (`chat/`)
 

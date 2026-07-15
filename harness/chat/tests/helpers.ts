@@ -14,6 +14,8 @@ export const stubDir = () => dir;
 export async function freshStubEnv() {
   dir = await mkdtemp(path.join(tmpdir(), "chat-test-"));
   logFile = path.join(dir, "commands.log");
+  // The replay switch is off unless a test flips it — the never-silent default.
+  delete process.env.DEMO_REPLAY;
   process.env.CHAT_REPO_ROOT = dir;
   process.env.CHAT_GIT_CMD = await writeStub("git");
   process.env.CHAT_GH_CMD = await writeStub("gh");

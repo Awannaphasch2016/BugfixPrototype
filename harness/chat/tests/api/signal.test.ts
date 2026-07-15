@@ -86,17 +86,20 @@ describe("POST /api/signal", () => {
     ]);
   });
 
-  it("files a novel class with the class and needs-human labels, after redaction and a labels-only ledger read", async () => {
+  it("files a novel class with the class and needs-human labels, after a labels-only ledger read and redaction", async () => {
     const res = await postSignal({ signature: SIGNATURE });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ routed: "needs-human", issue: 42, class: CLASS });
 
     const commands = await spawnedCommands();
-    expect(commands.slice(0, 6)).toEqual([
-      "gh issue list --state open --json number,title",
-      "redact",
-      "gh pr list --state merged --limit 500 --json number,title,url,headRefName",
+    expect(commands[0]).toBe("gh issue list --state open --json number,title");
+    // The ledger read (two parallel queries, either order) precedes redaction.
+    expect(commands.slice(1, 3).sort()).toEqual([
       "gh issue list --state closed --limit 500 --json number,title,url,stateReason,labels",
+      "gh pr list --state merged --limit 500 --json number,title,url,headRefName",
+    ]);
+    expect(commands.slice(3, 6)).toEqual([
+      "redact",
       `gh label create ${CLASS} --color 1d76db --description problem class — precedent ledger`,
       "gh label create needs-human --color d93f0b --description novel problem class — waiting for a human dispatch",
     ]);
@@ -106,6 +109,11 @@ describe("POST /api/signal", () => {
     );
     expect(commands[6]).toContain("## Context report");
     expect(commands[6]).toContain(`--label ${CLASS} --label needs-human`);
+    // The report names the class and honestly reports the empty ledger — no
+    // precedent link exists to point at.
+    expect(commands[6]).toContain(`**Problem class:** \`${CLASS}\``);
+    expect(commands[6]).toContain("no precedent");
+    expect(commands[6]).not.toContain("/issues/30");
     // Nothing dispatches on a novel class: the issue waits for a human.
     expect(commands.some((c) => c.startsWith("runner"))).toBe(false);
   });
@@ -123,16 +131,24 @@ describe("POST /api/signal", () => {
     });
 
     const commands = await spawnedCommands();
-    expect(commands.slice(0, 5)).toEqual([
-      "gh issue list --state open --json number,title",
-      "redact",
-      "gh pr list --state merged --limit 500 --json number,title,url,headRefName",
+    expect(commands[0]).toBe("gh issue list --state open --json number,title");
+    // The ledger read (two parallel queries, either order) precedes redaction.
+    expect(commands.slice(1, 3).sort()).toEqual([
       "gh issue list --state closed --limit 500 --json number,title,url,stateReason,labels",
+      "gh pr list --state merged --limit 500 --json number,title,url,headRefName",
+    ]);
+    expect(commands.slice(3, 5)).toEqual([
+      "redact",
       `gh label create ${CLASS} --color 1d76db --description problem class — precedent ledger`,
     ]);
     expect(commands[5]).toMatch(/^gh issue create --title /);
     expect(commands[5]).toContain(`--label ${CLASS}`);
     expect(commands[5]).not.toContain("needs-human");
+    // The report answers "why did this route autonomously" on the issue
+    // itself: the class named, the precedent linked — computed at filing
+    // time, correct every cycle.
+    expect(commands[5]).toContain(`**Problem class:** \`${CLASS}\``);
+    expect(commands[5]).toContain(`[#30](${REPO}/issues/30)`);
     // The shared dispatch core (restore, runner), then the setup.sh flow:
     // merge, sync the checkout, mark the lane on the record.
     expect(commands.slice(6)).toEqual([
@@ -144,6 +160,21 @@ describe("POST /api/signal", () => {
       "git pull --ff-only origin main",
       "gh issue edit 42 --add-label autofixed",
     ]);
+  });
+
+  it("auto-dispatches the follow-up attempt when the replay switch is on", async () => {
+    process.env.DEMO_REPLAY = "1";
+    await stubGh({ closed: PRECEDENT_CLOSED, merged: PRECEDENT_MERGED });
+    const res = await postSignal({ signature: SIGNATURE });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ routed: "autofix", issue: 42, class: CLASS });
+
+    await vi.waitFor(async () => {
+      expect((await spawnedCommands()).at(-1)).toBe("gh issue edit 42 --add-label autofixed");
+    });
+    // The signal route's dispatch context selects the follow-up entry — the
+    // attempt is never operator input.
+    expect(await spawnedCommands()).toContain("runner --replay --attempt 2 42");
   });
 
   it("skips the auto-dispatch when a run is in flight: still routed autofix, noted queued-behind-lock", async () => {

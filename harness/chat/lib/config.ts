@@ -24,6 +24,16 @@ export function redactCmd(): string {
   return process.env.CHAT_REDACT_CMD ?? path.join(repoRoot(), "harness", "redact.py");
 }
 
+// The one mode switch (stage-4b spec, ADR-0004): DEMO_REPLAY flips every
+// dispatch path — chat dispatch, the signal route's auto-dispatch, setup's
+// pre-run — to replay, and the UI banner renders from the same answer. Off by
+// default: a normal dispatch can never silently replay. No per-path toggles
+// exist, so a mixed-mode demo is unrepresentable.
+export function replayMode(): boolean {
+  const value = process.env.DEMO_REPLAY;
+  return !!value && value !== "0" && value !== "false";
+}
+
 export function signalLogFile(): string {
   return (
     process.env.SIGNAL_LOG_FILE ?? path.join(repoRoot(), "demo-app", "logs", "app.log")

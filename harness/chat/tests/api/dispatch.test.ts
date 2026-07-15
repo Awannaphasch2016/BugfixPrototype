@@ -90,6 +90,31 @@ describe("POST /api/dispatch", () => {
     expect((await dispatchIssue(2)).status).toBe(200);
   });
 
+  it("passes the replay flag with the first attempt when the replay switch is on", async () => {
+    process.env.DEMO_REPLAY = "1";
+    const res = await dispatchIssue(2);
+    expect(res.status).toBe(200);
+    expect(await spawnedCommands()).toEqual([
+      "git show HEAD:demo-app/data/tasks.json",
+      "git show HEAD:demo-app/logs/app.log",
+      "runner --replay --attempt 1 2",
+    ]);
+  });
+
+  it("keeps the note behind the replay flags — the runner still sees it last", async () => {
+    process.env.DEMO_REPLAY = "1";
+    await dispatchIssue(2, "use green for the text in the todo list");
+    expect((await spawnedCommands()).at(-1)).toBe(
+      "runner --replay --attempt 1 2 use green for the text in the todo list",
+    );
+  });
+
+  it("treats DEMO_REPLAY=0 as off: no replay flag reaches the runner", async () => {
+    process.env.DEMO_REPLAY = "0";
+    await dispatchIssue(2);
+    expect((await spawnedCommands()).at(-1)).toBe("runner 2");
+  });
+
   it("returns an honest error when the runner fails, and frees the lock", async () => {
     process.env.CHAT_RUNNER_CMD = await writeStub("runner", "exit 1");
     const res = await dispatchIssue(2);
