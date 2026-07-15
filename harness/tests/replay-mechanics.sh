@@ -40,7 +40,7 @@ DIRTY="$TMP/dirty-entry"
 mkdir -p "$DIRTY"
 printf '## Plan — planner agent\n\nSee the earlier fix in #12 for context.\n\nAlso https://github.com/acme/demo/pull/34 discusses it.\n' > "$DIRTY/plan.md"
 printf '## Review — reviewer agent\n\nMatches commit 3abe4e0dead in spirit.\n' > "$DIRTY/review.md"
-jq -n '{is_error:false, result:"## Diagnosis\n\nBroken since 2026-07-12."}' > "$DIRTY/result.json"
+jq -n '{is_error:false, result:"## Diagnosis\n\nBroken since 2031-01-02."}' > "$DIRTY/result.json"
 if "$COHERENCE" "$DIRTY" 7 > "$OUT/coherence-dirty.log" 2>&1; then
   fail "coherence accepted a dirty entry"
 fi
@@ -69,6 +69,31 @@ grep -q 'issue-{{issue}}' "$CLEAN/evidence/evidence.md" ||
 [[ "$(jq -r '.result' "$CLEAN/result.json")" == $'## Diagnosis\n\nThe defect behind issue #{{issue}}.' ]] ||
   fail "own issue number not normalized inside result.json's .result"
 
+# Follow-up entry: the full replay-variable set (ADR-0005) normalizes —
+# precedent number, precedent sha, run date, firing reqId — while a
+# frozen-world date (derived from the committed baseline log) passes the
+# lint untouched.
+FROZEN_EPOCH=$(git -C "$REPO_ROOT" show demo-baseline:demo-app/logs/app.log |
+  grep -oP '"time":\K[0-9]{10,13}' | head -1)
+[[ -n "$FROZEN_EPOCH" ]] || fail "baseline log carries no epoch timestamps to derive a frozen date from"
+FROZEN_DATE=$(date -u -d "@${FROZEN_EPOCH:0:10}" +%F)
+FUP="$TMP/followup-entry"
+mkdir -p "$FUP"
+printf '## Plan — planner agent\n\nBuilds on issue 9 (#9, https://github.com/acme/demo/issues/9): commit deadbee1234 landed 2026-06-30.\nThe firing (reqId rq7fresh, 2026-06-30) differs from the %s noise.\n' \
+  "$FROZEN_DATE" > "$FUP/plan.md"
+jq -n '{is_error:false, result:"Fix for issue #10 atop #9."}' > "$FUP/result.json"
+"$COHERENCE" "$FUP" 10 --precedent 9 --precedent-shas deadbee1234f00d \
+  --run-date 2026-06-30 --firing-reqid rq7fresh > "$OUT/coherence-fup.log" 2>&1 ||
+  { cat "$OUT/coherence-fup.log" >&2; fail "coherence rejected a follow-up entry whose stale refs are all replay variables"; }
+grep -q 'issue {{precedent}} (#{{precedent}}, https://github.com/acme/demo/issues/{{precedent}}): commit {{precedent_sha}} landed {{today}}' "$FUP/plan.md" ||
+  fail "precedent number/sha/run-date not normalized to replay variables"
+grep -q 'reqId {{fresh_reqid}}, {{today}}' "$FUP/plan.md" ||
+  fail "firing reqId not normalized to {{fresh_reqid}}"
+grep -q "$FROZEN_DATE noise" "$FUP/plan.md" ||
+  fail "frozen-world date was rewritten — it must stay verbatim"
+[[ "$(jq -r '.result' "$FUP/result.json")" == "Fix for issue #{{issue}} atop #{{precedent}}." ]] ||
+  fail "own/precedent numbers not normalized inside the follow-up's result.json"
+
 # ---- stubs for the runner ---------------------------------------------------
 export STUB_OUT="$OUT"
 
@@ -96,9 +121,17 @@ case "$1 $2" in
   "issue view")
     case "$*" in
       *"-q .title") echo "Stub bug title" ;;
-      *"-q .body")  echo "Stub bug body line." ;;
+      *"-q .body")
+        # Body shaped like a signal issue's: precedent link + firing line, so
+        # replay-variable resolution has its sources. Harmless extra context
+        # for entries that use no variables.
+        printf 'Stub bug body line.\n\n**Problem class:** `class:stub` — precedent: [#9](https://github.com/acme/demo/issues/9), fixed by a merged PR.\n\n{"level":50,"reqId":"rq7fresh","msg":"stub signature"}\n' ;;
       *) echo "gh stub: unexpected issue view: $*" >&2; exit 1 ;;
     esac ;;
+  "pr view")
+    # replay's {{precedent_sha}} resolution: gh applies --jq itself, so the
+    # stub emits the post-jq value (the precedent fix commit's full oid).
+    echo "deadbee1f00d1234deadbee1f00d1234deadbee1" ;;
   "issue comment")
     N_FILE="$STUB_OUT/issue-comments"; N=$(( $(cat "$N_FILE" 2>/dev/null || echo 0) + 1 ))
     echo "$N" > "$N_FILE"
@@ -117,7 +150,9 @@ case "$1 $2" in
   "label list")
     printf 'autofixed\nclass:list-filter\n' ;;
   "pr list")
-    echo "99" ;;
+    # merged query = replay resolving the precedent's fix PR; open query =
+    # setup.sh finding the pre-run's PR. Post-jq values, as above.
+    if [[ "$*" == *"--state merged"* ]]; then echo "77"; else echo "99"; fi ;;
   "pr merge") : ;;
   "issue edit") : ;;
   *) echo "gh stub: unexpected args: $*" >&2; exit 1 ;;
@@ -184,9 +219,9 @@ printf 'not-really-a-png' > "$CACHE1/evidence/before-symptom.png"
 printf 'not-really-a-png' > "$CACHE1/evidence/after-symptom.png"
 jq -n --arg r "$RESULT_1" '{is_error:false, result:$r}' > "$CACHE1/result.json"
 
-PLAN_2=$'## Plan — planner agent\n\nFollow-up plan for issue #{{issue}}, on top of the first fix.'
-REVIEW_2=$'## Review — reviewer agent\n\n### Verdict\n\nFollow-up meets the standards for issue #{{issue}}.'
-RESULT_2=$'## Diagnosis\n\nFollow-up diagnosis for issue #{{issue}}.\n\n## Fix\n\nThe follow-up fix.\n\n## Regression test\n\nRed-then-green again.'
+PLAN_2=$'## Plan — planner agent\n\nFollow-up plan for issue #{{issue}}, on top of #{{precedent}} (commit {{precedent_sha}}); the firing (reqId {{fresh_reqid}}) landed {{today}}.'
+REVIEW_2=$'## Review — reviewer agent\n\n### Verdict\n\nFollow-up meets the standards for issue #{{issue}}; scoped to the {{fresh_reqid}} firing.'
+RESULT_2=$'## Diagnosis\n\nFollow-up diagnosis for issue #{{issue}}, building on #{{precedent}}.\n\n## Fix\n\nThe follow-up fix.\n\n## Regression test\n\nRed-then-green again.'
 printf '%s' "$PLAN_2"   > "$CACHE2/plan.md"
 printf '%s' "$REVIEW_2" > "$CACHE2/review.md"
 jq -n --arg r "$RESULT_2" '{is_error:false, result:$r}' > "$CACHE2/result.json"
@@ -235,9 +270,26 @@ git -C "$TMP/origin.git" show "refs/heads/fix/issue-8:demo-app/replay-fix.txt" >
 [[ "$(cat "$OUT/second-file.txt")" == $'certified first fix\ncertified follow-up fix' ]] ||
   fail "follow-up patch did not apply on top of the first fix's merged state"
 
-printf '%s' "${PLAN_2//'{{issue}}'/8}" > "$OUT/expected-plan-2.txt"
+# Every replay variable resolved from the fresh cycle's record: issue 8 from
+# the dispatch, precedent 9 + firing reqId from the stub issue body, the sha
+# from the stubbed precedent-PR lookup (cut to 7), today from the clock.
+fill_expected() {
+  local s="$1"
+  s=${s//'{{issue}}'/8}
+  s=${s//'{{precedent}}'/9}
+  s=${s//'{{precedent_sha}}'/deadbee}
+  s=${s//'{{fresh_reqid}}'/rq7fresh}
+  s=${s//'{{today}}'/$(date -u +%F)}
+  printf '%s' "$s"
+}
+fill_expected "$PLAN_2" > "$OUT/expected-plan-2.txt"
 cmp -s "$OUT/expected-plan-2.txt" "$OUT/issue-comment-1.txt" ||
-  fail "follow-up replay posted the wrong attempt's plan (attempt selection broken)"
+  { diff "$OUT/expected-plan-2.txt" "$OUT/issue-comment-1.txt" >&2 || true
+    fail "follow-up plan not posted with every replay variable resolved"; }
+fill_expected "$REVIEW_2" > "$OUT/expected-review-2.txt"
+cmp -s "$OUT/expected-review-2.txt" "$OUT/pr-comment-2.txt" ||
+  fail "follow-up review not posted with every replay variable resolved"
+grep -rq '{{' "$OUT/pr-create-body.txt" && fail "unresolved variable leaked into the follow-up PR body"
 
 # Beats: plan → PR → gate report → review (no evidence in attempt-2), so
 # exactly three inter-beat sleeps, each the configured nine seconds.

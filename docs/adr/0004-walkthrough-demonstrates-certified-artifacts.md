@@ -4,7 +4,9 @@
 **Status:** Accepted. Supersedes the presentation clause of the replay hard
 rules (`docs/stage-4-spec.md`, 2026-07-12): "a replayed run is never presented
 to an audience as live." The companion hard rule — **replay never certifies** —
-stands unchanged and is load-bearing for this decision.
+stands unchanged and is load-bearing for this decision. The "cached prose is
+renumbered, narrowly" clause below is superseded by ADR-0005 (replay
+variables, 2026-07-15).
 
 ## Context
 
