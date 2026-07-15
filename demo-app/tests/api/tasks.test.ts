@@ -50,6 +50,14 @@ describe("POST /api/tasks", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a title over 100 characters with 400 and stores nothing", async () => {
+    const res = await createTask({ title: "x".repeat(101) });
+    expect(res.status).toBe(400);
+
+    const list = await (await listTasks()).json();
+    expect(list.tasks).toHaveLength(0);
+  });
+
   it("stores the due date when one is given", async () => {
     await createTask({ title: "Renew SSL cert", dueDate: "2026-08-01" });
     const list = await (await listTasks()).json();

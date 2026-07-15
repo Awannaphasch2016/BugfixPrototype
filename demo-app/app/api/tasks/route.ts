@@ -1,6 +1,7 @@
 import { requestLogger } from "@/lib/logger";
 import { readTasks, writeTasks } from "@/lib/store";
 import { newTaskId, type Task } from "@/lib/tasks";
+import { taskSchema } from "@/lib/validation";
 
 export async function GET(req: Request) {
   const status = new URL(req.url).searchParams.get("status");
@@ -31,6 +32,13 @@ export async function POST(req: Request) {
     dueDate: body.dueDate ?? null,
     createdAt: new Date().toISOString(),
   };
+  if (!taskSchema.safeParse(task).success) {
+    log.warn({ payload: body }, "create rejected: invalid title");
+    return Response.json(
+      { error: "validation failed: title must be 1-100 characters" },
+      { status: 400 }
+    );
+  }
   const tasks = await readTasks();
   tasks.push(task);
   await writeTasks(tasks);
