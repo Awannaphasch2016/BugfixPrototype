@@ -35,11 +35,14 @@ these coordinates are:
 
 Two supporting rules:
 
-- **Frozen-world literals pass the lint.** A date that lives in the baseline
-  demo-app tree — verbatim in seeded content, or derived from the committed
-  log's epoch timestamps — cannot go stale, because the world it describes
-  is frozen at the tag. Only the agents' world (`demo-app/`) qualifies; the
-  wider repo's spec and record dates deliberately do not.
+- **Frozen-world literals pass the lint.** A date that lives in the agents'
+  reachable world at the baseline tag — the demo-app tree (verbatim seeded
+  content, or derived from the committed log's epoch timestamps) and the
+  project skills the Skill tool hands every agent session — cannot go
+  stale, because that world is frozen at the tag. The wider repo's spec and
+  record dates deliberately do not qualify. (Discovered live: the reviewer
+  legitimately consulted the signaling-layer skill through the Skill tool
+  and quoted its verification date.)
 - **A variable that cannot resolve aborts the replay** — better no artifact
   than a lying one. Capture reads its values from the record itself (issue
   body, merged PRs), never from operator input.

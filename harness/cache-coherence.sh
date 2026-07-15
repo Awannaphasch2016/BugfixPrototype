@@ -87,10 +87,12 @@ FROZEN_DATES=$(
 )
 frozen_date() { # <YYYY-MM-DD or slash date> — 0 when the date cannot go stale
   grep -qxF "$1" <<<"$FROZEN_DATES" && return 0
-  # Only the agents' world counts as frozen: a date quoted from the baseline
-  # demo-app tree (seeded log payloads, the docs corpus) can never go stale.
-  # The wider repo's spec/record dates deliberately do NOT qualify.
-  git grep -qF "$1" "$TAG" -- demo-app >/dev/null 2>&1
+  # Only the agents' reachable world counts as frozen: the baseline demo-app
+  # tree (seeded log payloads, the docs corpus) and the project skills the
+  # Skill tool hands every agent session. Both are frozen at the tag, so a
+  # date quoted from them can never go stale. The wider repo's spec/record
+  # dates deliberately do NOT qualify.
+  git grep -qF "$1" "$TAG" -- demo-app .claude/skills >/dev/null 2>&1
 }
 
 FAILED=0
