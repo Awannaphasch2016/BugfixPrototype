@@ -33,7 +33,7 @@ handler emits:
 | `POST /api/tasks`    | `task created`                    | info  | `taskId`              |
 | `PATCH /api/tasks/:id` | `updating task`                 | info  | `taskId`, `payload`   |
 | `PATCH /api/tasks/:id` | `task not found`                | warn  | `taskId`              |
-| `PATCH /api/tasks/:id` | `task update failed validation` | error | `err`, `taskId`       |
+| `PATCH /api/tasks/:id` | `task update failed validation` | warn  | `err`, `taskId`       |
 | `PATCH /api/tasks/:id` | `task updated`                  | info  | `taskId`              |
 
 Useful first passes:
